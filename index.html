@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consortia Advisory OS — clickable prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brand:#800020;--accent:#0C4767;--accent-dk:#0a3a54;--attn:#E6C99B;--attn-b:#D2B183;--attn-soft:#F0DFC4;
+  --danger:#9A3B1A;--success:#657153;--surface:#FAF3E9;--sunken:#F3E7DE;--canvas:#E9D7D1;
+  --border:#DCC6BF;--border-sub:#E6D4CD;--border-dash:#C9ABA3;--track:#EEDED8;--inactive:#E3CEC7;
+  --text:#2A1E20;--text-2:#463639;--text-3:#5A4548;--muted:#6B5457;--faint:#8B7275;--ghost:#9C8386;--on:#FAF3E9;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--canvas);font-family:Inter,system-ui,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;font-size:12.5px;line-height:1.5}
+a{color:var(--brand);text-decoration:none}a:hover{color:var(--accent)}
+b{font-weight:600}
+button{font-family:inherit}
+.serif{font-family:Newsreader,serif}
+.muted{color:var(--muted)}.faint{color:var(--faint)}.ghost{color:var(--ghost)}.danger{color:var(--danger)}.success{color:var(--success)}.accent{color:var(--accent)}
+.w500{font-weight:500}.w600{font-weight:600}
+.app{display:flex;min-height:100vh}
+
+/* ---- sidebar ---- */
+.sidebar{width:216px;flex:none;background:var(--brand);color:var(--on);display:flex;flex-direction:column;padding:20px 14px;gap:2px;position:sticky;top:0;height:100vh}
+.brand{padding:0 8px 20px;display:flex;flex-direction:column;gap:2px}
+.brand .wm{font:600 15px Newsreader,serif;letter-spacing:.16em}
+.brand .sub{font:500 9px Inter,sans-serif;letter-spacing:.22em;color:rgba(250,243,233,.55)}
+.nav{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;font:500 13px Inter,sans-serif;cursor:pointer;transition:background .12s;color:rgba(250,243,233,.82)}
+.nav:hover{background:rgba(250,243,233,.14)}
+.nav.active{background:var(--on);color:var(--brand);font-weight:600}
+.nav .count{margin-left:auto;font-size:10px;background:var(--attn);color:var(--brand);border-radius:9px;padding:1px 7px;font-weight:600}
+.nav-h{padding:16px 8px 6px;font:600 9px Inter,sans-serif;letter-spacing:.18em;color:rgba(250,243,233,.45)}
+.sb-bottom{margin-top:auto;display:flex;flex-direction:column;gap:2px}
+.user{display:flex;align-items:center;gap:9px;padding:12px 8px 0;margin-top:8px;border-top:1px solid rgba(250,243,233,.16);cursor:pointer}
+.user .av{width:26px;height:26px;border-radius:50%;background:var(--attn);color:var(--brand);display:flex;align-items:center;justify-content:center;font:600 10px Inter,sans-serif;flex:none}
+.user .nm{font:500 12px Inter,sans-serif}.user .rl{font-size:10px;color:rgba(250,243,233,.55)}
+
+/* ---- main ---- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:14px;padding:16px 28px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5}
+.title{font:600 19px Newsreader,serif;white-space:nowrap}
+.search{flex:1 1 auto;min-width:150px;max-width:340px;margin-left:12px;height:32px;border:1px solid var(--border);border-radius:16px;background:var(--sunken);padding:0 14px;color:var(--faint);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;position:relative}
+.search input{border:0;background:transparent;outline:0;font:inherit;color:var(--text);width:100%}
+.search input::placeholder{color:var(--faint)}
+.search-dd{position:absolute;top:36px;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;z-index:20;white-space:normal}
+.search-dd div{padding:9px 14px;font-size:12px;cursor:pointer;border-top:1px solid var(--border-sub)}
+.search-dd div:first-child{border-top:0}.search-dd div:hover{background:var(--sunken)}
+.search-dd .k{font-size:10px;color:var(--faint);margin-left:6px}
+.spacer{flex:1}
+.entity{font-size:12px;color:var(--muted);cursor:pointer;position:relative;white-space:nowrap}
+.btn{border:1px solid var(--border);border-radius:8px;padding:7px 12px;font:500 12px Inter,sans-serif;background:var(--sunken);color:var(--text);cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--attn-soft)}
+.btn.primary{background:var(--accent);color:var(--on);border-color:var(--accent);padding:8px 14px;font-weight:600}
+.btn.primary:hover{background:var(--accent-dk)}
+.btn.brand-o{border-color:var(--brand);color:var(--brand);background:transparent}
+.btn.sm{padding:4px 9px;font-size:11px}
+.btn:focus-visible,.nav:focus-visible,.trow:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.content{flex:1;padding:24px 28px 40px}
+.col{display:flex;flex-direction:column;gap:18px}
+.menu{position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;min-width:200px;z-index:30;overflow:hidden;padding:6px}
+.menu div{padding:8px 10px;border-radius:8px;font-size:12px;cursor:pointer;color:var(--text)}
+.menu div:hover{background:var(--sunken)}
+.menu .mh{font:600 10px Inter,sans-serif;letter-spacing:.08em;color:var(--muted);padding:8px 10px 4px;cursor:default}
+.menu .mh:hover{background:transparent}
+.rel{position:relative}
+
+/* ---- cards / tables ---- */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px}
+.card.pad{padding:18px}
+.card.attn{background:var(--attn)}
+.card.attn:hover{border-color:var(--brand)}
+.card-h{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border-sub)}
+.card-h .t{font:600 14px Inter,sans-serif}
+.card-h .s{font-size:11px;color:var(--muted)}
+.h14{font:600 14px Inter,sans-serif}.h13{font:600 13px Inter,sans-serif}
+.sub11{font-size:11px;color:var(--muted)}
+.thead{display:grid;gap:12px;padding:9px 18px;background:var(--sunken);font:600 10px Inter,sans-serif;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.trow{display:grid;gap:12px;padding:13px 18px;border-top:1px solid var(--border-sub);font-size:12.5px;align-items:center}
+.trow.click{cursor:pointer}.trow.click:hover{background:var(--sunken)}
+.trow.attn{background:var(--attn)}.trow.attn:hover{background:var(--attn-soft)}
+.trow>span:first-child{font-weight:500}
+.trow.tot{font-weight:600;background:var(--sunken)}
+.rounded{overflow:hidden}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--border-sub);font-size:12px}
+.kv:first-child{border-top:0;padding-top:0}
+.kv .k{color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer}
+.kpi:hover{background:var(--sunken)}
+.kpi.attn{background:var(--attn)}.kpi.attn:hover{border-color:var(--brand);background:var(--attn)}
+.kpi .l{font:500 11px Inter,sans-serif;color:var(--muted);letter-spacing:.04em}
+.kpi.attn .l{color:var(--text-3)}
+.kpi .v{font:400 30px Newsreader,serif;margin-top:6px}
+.kpi .d{font-size:11px;margin-top:2px}
+.grid2{display:grid;grid-template-columns:1.55fr 1fr;gap:18px;align-items:start}
+.chip{display:inline-block;font-size:10px;padding:2px 8px;border-radius:9px;background:var(--sunken);color:var(--text-2);white-space:nowrap}
+.chip.attn{background:var(--attn);color:var(--text-3)}
+.chip.brand{background:var(--brand);color:var(--on)}
+.chip.accent{background:var(--accent);color:var(--on)}
+.chip.sm{font-size:9px;padding:1px 7px}
+.pills{display:flex;gap:6px}
+.pill{padding:6px 12px;border-radius:8px;font:500 12px Inter,sans-serif;cursor:pointer;color:var(--muted);border:1px solid transparent}
+.pill:hover{background:var(--sunken)}
+.pill.active{background:var(--brand);color:var(--on)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);padding:0 6px}
+.tab{padding:10px 12px;font:500 12px Inter,sans-serif;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);font-weight:600;border-bottom-color:var(--brand)}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pips{display:flex;gap:3px}
+.pips i{flex:1;height:8px;border-radius:2px;background:var(--track)}
+.pips i.done{background:var(--brand)}.pips i.cur{background:var(--accent)}.pips i.blk{background:var(--danger)}
+.stepper{display:flex;gap:5px}
+.step{flex:1;display:flex;flex-direction:column;gap:6px;cursor:pointer}
+.step .bar{height:6px;border-radius:4px;background:var(--track)}
+.step .lb{font-size:9.5px;color:var(--ghost);text-align:center;line-height:1.3}
+.step.done .bar{background:var(--brand)}.step.done .lb{color:var(--muted)}
+.step.cur .bar{height:10px;background:var(--accent)}.step.cur .lb{color:var(--text);font-weight:600}
+.step.cur.blk .bar{background:var(--danger)}
+.gate{background:var(--attn);border:1px solid var(--attn-b);border-radius:8px;padding:9px 14px;font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:10px}
+.gate.hard{color:var(--danger);font-weight:500}
+.board{display:grid;gap:11px}
+.bcol{background:var(--canvas);border:1px solid var(--border-sub);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:7px;min-height:80px}
+.bcol.over{outline:2px dashed var(--accent);outline-offset:-2px}
+.bcol .bh{font:600 10px Inter,sans-serif;letter-spacing:.07em;color:var(--muted);text-transform:uppercase;padding:2px 4px;display:flex;justify-content:space-between;align-items:center}
+.bcard{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;cursor:grab}
+.bcard:hover{background:var(--sunken)}
+.bcard.attn{background:var(--attn)}
+.bcard .n{font-size:12px;font-weight:600}
+.bcard .m{font-size:10.5px;color:var(--muted)}
+.bcard .f{display:flex;align-items:center;gap:6px}
+.adv{margin-left:auto;width:20px;height:20px;border-radius:6px;border:1px solid var(--border);background:transparent;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;color:var(--text);flex:none}
+.adv:hover{background:var(--accent);color:var(--on);border-color:var(--accent)}
+.bar-h{display:flex;align-items:flex-end;gap:12px;height:120px}
+.bar-h>div{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;justify-content:flex-end;height:100%}
+.bar-h .b{width:100%;background:var(--inactive);border-radius:5px 5px 0 0}
+.bar-h .b:hover{opacity:.85}
+.bar-h .l{font-size:10px;color:var(--muted);text-align:center}
+.util{display:flex;align-items:center;gap:10px;font-size:12px}
+.util .n{width:62px;color:var(--muted)}.util .tr{flex:1;height:8px;background:var(--track);border-radius:4px;overflow:hidden}.util .fl{height:100%;background:var(--accent);border-radius:4px}.util .p{width:36px;text-align:right}
+.act{display:flex;gap:11px}
+.act .dot{width:8px;height:8px;border-radius:50%;background:var(--inactive);margin-top:5px;flex:none}
+.act .tx{font-size:12px;line-height:1.5}.act .mt{font-size:11px;color:var(--faint)}
+.dot-accent{background:var(--accent)!important}.dot-success{background:var(--success)!important}.dot-brand{background:var(--brand)!important}
+.decision{background:var(--attn);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:9px}
+.decision:hover{border-color:var(--brand)}
+.decision .t{font:600 13px Inter,sans-serif}
+.decision .li{font-size:12px;line-height:1.65;color:var(--text-2);cursor:pointer}
+.decision .li:hover{color:var(--brand)}
+.avatar{border-radius:50%;background:var(--attn);color:var(--brand);display:flex;align-items:center;justify-content:center;font:600 10px Inter,sans-serif;flex:none}
+.avatar.sq{border-radius:10px;background:var(--brand);color:var(--on);font-size:14px}
+.drop{border:1px dashed var(--border-dash);border-radius:10px;padding:18px;text-align:center;color:var(--ghost);font-size:11.5px}
+.empty{border:1px dashed var(--border-dash);border-radius:12px;padding:40px;text-align:center;color:var(--ghost);font-size:12.5px}
+.ta{width:100%;min-height:70px;border:1px solid var(--border);border-radius:8px;background:var(--sunken);padding:9px 11px;font:inherit;color:var(--text);resize:vertical;outline:0}
+.ta:focus{border-color:var(--accent)}
+input.cell{width:100%;border:0;background:transparent;text-align:center;font:inherit;color:var(--text);outline:0;padding:4px 0;border-radius:6px}
+input.cell:focus{background:var(--attn-soft)}
+.msg{display:flex;flex-direction:column;gap:3px;max-width:70%}
+.msg .bub{padding:9px 12px;border-radius:12px;background:var(--sunken);font-size:12px;line-height:1.5}
+.msg.me{align-self:flex-end}.msg.me .bub{background:var(--accent);color:var(--on)}
+.msg .mt{font-size:10px;color:var(--faint)}
+.msg.internal .bub{background:var(--attn-soft);border:1px dashed var(--attn-b)}
+.sec{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:12px;cursor:pointer}
+.sec:hover{background:var(--sunken)}.sec.active{background:var(--attn)}
+.sec .st{margin-left:auto;font-size:10px;color:var(--muted)}
+.doc{background:var(--sunken);border:1px solid var(--border);border-radius:10px;padding:18px 22px;font-family:Newsreader,serif;font-size:13.5px;line-height:1.7;color:var(--text-2);min-height:300px}
+.doc h4{font:600 16px Newsreader,serif;margin:0 0 8px}
+.doc p{margin:0 0 10px}
+.cmt{border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}
+.cmt.resolved{opacity:.55}
+.cmt .who{font-size:10.5px;color:var(--faint)}
+.cmt .acts{display:flex;gap:6px}
+
+/* ---- toast / drawer / modal ---- */
+.toasts{position:fixed;bottom:22px;right:22px;display:flex;flex-direction:column;gap:8px;z-index:100;max-width:380px}
+.toast{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:10px;padding:10px 14px;font-size:12px;line-height:1.5}
+.toast.err{border-left-color:var(--danger)}.toast.ok{border-left-color:var(--success)}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:360px;background:var(--surface);border-left:1px solid var(--border);z-index:60;padding:22px 24px;overflow:auto;display:none;font-size:12px;line-height:1.6}
+.drawer.open{display:block}
+.drawer h3{font:600 17px Newsreader,serif;margin:0 0 4px}
+.drawer h4{font:600 10px Inter,sans-serif;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin:18px 0 6px}
+.drawer ul{margin:0;padding-left:16px}.drawer li{margin-bottom:5px}
+.drawer .x{position:absolute;top:18px;right:18px}
+.specbtn{border:1px solid var(--brand);color:var(--brand);background:transparent;border-radius:8px;padding:7px 12px;font:500 12px Inter,sans-serif;cursor:pointer;white-space:nowrap}
+.specbtn:hover,.specbtn.on{background:var(--brand);color:var(--on)}
+.overlay{position:fixed;inset:0;background:rgba(42,30,32,.35);z-index:80;display:none;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:440px;padding:22px;display:flex;flex-direction:column;gap:12px}
+.modal h3{font:600 17px Newsreader,serif;margin:0}
+.field{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted)}
+.field input,.field select{border:1px solid var(--border);border-radius:8px;background:var(--sunken);padding:8px 10px;font:inherit;color:var(--text);font-size:12.5px;outline:0}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.notif{position:absolute;top:calc(100% + 6px);right:0;width:320px;background:var(--surface);border:1px solid var(--border);border-radius:12px;z-index:30;overflow:hidden}
+.notif .n{padding:10px 14px;border-top:1px solid var(--border-sub);font-size:12px;cursor:pointer}
+.notif .n:first-child{border-top:0}.notif .n:hover{background:var(--sunken)}
+.notif .n .m{font-size:10.5px;color:var(--faint)}
+
+/* ---- portal ---- */
+.portal{max-width:860px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.pbar{background:var(--brand);color:var(--on);padding:14px 18px;display:flex;align-items:center;gap:12px}
+.pbar .wm{font:600 14px Newsreader,serif;letter-spacing:.16em}
+.pbody{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+.pcard{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.pcard .ph{padding:11px 14px;display:flex;align-items:center;gap:10px;font-size:12.5px}
+.pcard .ph.attn{background:var(--attn)}
+.pcard .pr{padding:11px 14px;border-top:1px solid var(--border-sub);display:flex;align-items:center;gap:12px;font-size:12px}
+.pcard .pr .m{font-size:10.5px;color:var(--faint)}
+.hint{font-size:11px;color:var(--faint);font-style:italic}
+.legend{font-size:10.5px;color:var(--faint);padding:10px 18px;border-top:1px solid var(--border-sub)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.skel{background:var(--inactive);border-radius:6px}
+@media (max-width:1280px){.kpis{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---- engagement module ---- */
+.ehead{display:flex;align-items:flex-start;gap:20px}
+.money{margin-left:auto;display:flex;gap:26px}.money div{display:flex;flex-direction:column}.money .l{font-size:10.5px;color:var(--muted)}.money .v{font:600 20px Newsreader,serif}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}.field.w{grid-column:1/-1}.field input:disabled{opacity:.6}
+.toggle{display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;width:max-content;background:var(--surface)}
+.toggle button{border:0;background:transparent;padding:6px 11px;font:500 12px Inter,sans-serif;color:var(--muted);cursor:pointer}.toggle button.on{background:var(--brand);color:var(--on)}.toggle button:disabled{cursor:default;opacity:.7}
+.appr{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 4px}
+.ap{border:1px solid var(--border);border-radius:9px;padding:10px 12px;background:var(--surface);display:flex;gap:10px;align-items:flex-start;cursor:pointer;text-align:left;font:inherit;color:var(--text)}
+.ap .bx{width:16px;height:16px;border:1.5px solid var(--ghost);border-radius:4px;flex:none;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff}
+.ap.on{border-color:var(--brand);background:var(--sunken)}.ap.on .bx{background:var(--brand);border-color:var(--brand)}.ap:disabled{cursor:default}
+.ap .n{font-weight:600;font-size:12.5px}.ap .d{font-size:11px;color:var(--muted)}
+.doc mark{background:var(--attn);padding:0 2px;border-radius:2px;color:var(--text)}.doc .sec{font-weight:600;margin-top:12px}.doc ul{margin:0 0 9px 18px;padding:0}.doc li{margin:2px 0}.doc.small{font-size:12.5px;max-height:320px;overflow:auto}
+.inv{display:grid;grid-template-columns:1fr auto auto;gap:6px 12px;align-items:center;font-size:12px}.inv .a{font:600 14px Newsreader,serif;text-align:right}.inv .t{color:var(--muted);font-size:11px}
+.invc{border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px;display:flex;flex-direction:column;gap:7px}
+.ent{display:flex;align-items:center;gap:10px;font-size:11.5px;flex-wrap:wrap}.ent .k{color:var(--muted)}.entd{font-size:11px;color:var(--muted);line-height:1.4}
+.tl{display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--text-2)}.tl div{display:flex;gap:8px}.tl span:first-child{color:var(--faint);width:52px;flex:none}
+.dl{display:flex;flex-direction:column;gap:6px}.dl .d{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px}.dl .d .st{margin-left:auto;font-size:11px;color:var(--muted)}.dl .d.up{background:var(--sunken)}
+.stripe{display:inline-flex;align-items:center;gap:8px;background:#635BFF;color:#fff;border:0;border-radius:8px;padding:8px 14px;font:600 12px Inter,sans-serif;cursor:pointer}.stripe:hover{background:#4f47e6}
+.ivm{background:#fff;color:#222;width:640px;max-height:92vh;overflow:auto;padding:36px 40px;border-radius:6px;font:11.5px/1.45 Helvetica,Arial,sans-serif;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.ivm .x{position:absolute;top:10px;right:10px}
+.ivtop{display:flex;justify-content:space-between;align-items:flex-start}.ivlogo{font:400 26px Newsreader,serif;letter-spacing:.04em}.ivh{text-align:right}.ivh h1{font:300 32px/1 Helvetica,Arial,sans-serif;margin:0;color:#333}.ivh div{color:#555;margin-top:3px}
+.ivmeta{display:flex;justify-content:space-between;margin-top:20px}.ivmeta b{display:block}.ivbill{margin-top:16px}.ivbill span{color:#777;display:block}
+.ivdates{width:230px}.ivdates div{display:flex;justify-content:space-between;padding:3px 10px}.ivdates div span:first-child{color:#777}.ivdates .bal{background:#f0f0f0;font-weight:700;padding:7px 10px;margin-top:3px}.ivdates .bal span{color:#222}
+.ivt{width:100%;border-collapse:collapse;margin-top:34px}.ivt th{background:#333;color:#fff;font-weight:400;text-align:left;padding:6px 10px}.ivt td{padding:10px;vertical-align:top}.ivt th:nth-child(n+2),.ivt td:nth-child(n+2){text-align:right}
+.ivtot{width:220px;margin:22px 0 0 auto}.ivtot div{display:flex;justify-content:space-between;padding:4px 10px}.ivtot span:first-child{color:#777}
+.ivnotes{margin-top:26px;line-height:1.5}.ivnotes span{color:#777}
+@media (max-width:1000px){.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div class="toasts" id="toasts"></div>
+<div class="drawer" id="drawer"></div>
+<div class="overlay" id="overlay"></div>
+<script>
+/* ============ ENGAGEMENTS (pre-sale: Call 1 → engagement letter → valuation start) ============ */
+const APPROACHES=[
+  {id:'dcf',n:'Income — DCF',d:'Discounted Cash Flow analysis',line:'Income Approach (Discounted Cash Flow DCF Analysis)'},
+  {id:'cca',n:'Market — Comparables',d:'Comparable Company Analysis',line:'Market Approach (Comparable Company Analysis)'},
+  {id:'pt',n:'Market — Precedents',d:'Precedent Transactions',line:'Market Approach (Precedent Transactions)'},
+  {id:'nav',n:'Asset-based — NAV',d:'Net Asset Value method',line:'Asset-Based Approach (Net Asset Value - NAV Method)'}];
+const DEPOSIT=500, CAP=5000;
+const ENTITY_DETAIL={
+  CY:{name:'Consortia Ltd',addr:'Efesou 9, 5280 Paralimni, Cyprus',lines:['Efesou 9, Paralimni','5280, Cyprus','Tel +357 99 637 198','VAT No: CY10386363Z','TIC No: 10386363Z','info@consortiaadvisory.com']},
+  UK:{name:'Consortia Advisory LLP',addr:'71-75 Shelton Street, Covent Garden, London WC2H 9JQ, United Kingdom',lines:['71-75 Shelton Street','Covent Garden, London','WC2H 9JQ, United Kingdom']}};
+const BANKS={'CY-EUR':{name:'CONSORTIA LTD',no:'357035231876',iban:'CY71002001950000357035231876',swift:'BCYPCY2N'},
+  'UK-EUR':{name:'CONSORTIA ADVISORY LLP',no:'357046171948',iban:'CY05002001950000357046171948',swift:'BCYPCY2N'},
+  'UK-GBP':{name:'CONSORTIA ADVISORY LLP',no:'357046171964',iban:'CY58002001950000357046171964',swift:'BCYPCY2N'}};
+const UKC=['uk','united kingdom','gb','great britain','england','scotland','wales','northern ireland'];
+const defaultEntity=c=>UKC.includes((c||'').trim().toLowerCase())?'CY':'UK';   // UK client → Cyprus company; everyone else → LLP
+function approachLines(sel){const s=new Set(sel),o=[];if(s.has('dcf'))o.push(APPROACHES[0].line);if(s.has('cca')&&s.has('pt'))o.push('Market Approach (Comparable Company Analysis & Precedent Transactions)');else if(s.has('cca'))o.push(APPROACHES[1].line);else if(s.has('pt'))o.push(APPROACHES[2].line);if(s.has('nav'))o.push(APPROACHES[3].line);return o;}
+function schedule(fee){const half=Math.min(fee*.5,CAP);return{half,inv1:Math.max(half-DEPOSIT,0),inv2:fee-half};}
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function longDate(iso){const d=new Date(iso+'T00:00:00');const n=d.getDate();const s=(n%10==1&&n!=11)?'st':(n%10==2&&n!=12)?'nd':(n%10==3&&n!=13)?'rd':'th';return `${n}<sup>${s}</sup> ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;}
+const TODAY='2026-09-06', NOW='6 Sep';
+const eng=id=>DB.engagements.find(e=>e.id===id);
+const engStage=e=>{if(e.call2.outcome==='declined')return 'declined';if(e.project)return 'valuation_active';if(e.el.status==='signed')return 'engaged';if(e.call2.held)return 'proposal';if(e.docs.filter(d=>d.req!==false).every(d=>d.up))return 'review_pending';if(e.nda.status==='signed')return 'docs_pending';if(e.deposit.status!=='pending')return 'nda_pending';return 'deposit_pending';};
+const ESTAGE={deposit_pending:['Awaiting deposit','attn'],nda_pending:['NDA outstanding','attn'],docs_pending:['Awaiting financials','attn'],review_pending:['Ready for Call 2',''],proposal:['Proposal — letter pending','attn'],engaged:['Engaged — Invoice 1 due','accent'],valuation_active:['Valuation in progress','brand'],declined:['Declined','']};
+const ESTEPS=[{n:'Call 1 deposit',done:e=>e.deposit.status!=='pending'},{n:'NDA',done:e=>e.nda.status==='signed'},{n:'Financials',done:e=>e.docs.filter(d=>d.req!==false).every(d=>d.up)},{n:'Call 2 · review',done:e=>!!e.call2.held},{n:'Engagement letter',done:e=>e.el.status==='signed'},{n:'Invoice & start',done:e=>!!e.project}];
+const engCur=e=>{const i=ESTEPS.findIndex(s=>!s.done(e));return i<0?5:i;};
+function engLog(e,m){e.activity.unshift({t:NOW,m});log('inactive',`<b>${e.code}</b> · ${m}`,`${esc(e.companyName||e.contactName)} · just now`,`#/engagement/${e.id}`);}
+function engNextInvNo(ent){return ++DB.invNo[ent];}
+
+/* ---- factory + seeds ---- */
+function mkEng(o,level){
+  const e=Object.assign({country:'Cyprus',isIndividual:false,contactTitle:'Director',fee:0,approaches:['dcf','cca','pt'],deposit:{status:'pending'},depositInvoice:null,nda:{status:'none'},docs:[{l:'Audited financial statements (last 3 years)'},{l:'Management accounts YTD'},{l:'Debt schedule & bank facilities'},{l:'Shareholder register'},{l:'Budget / forecast (if any)',req:false}],call2:{held:null,outcome:null},el:{status:'none',version:0},invoices:[],project:null,activity:[],fathom1:'https://fathom.video/share/c1',fathom2:''},o);
+  e.el.data={client_name:e.contactName,client_title:e.contactTitle,company_name:e.companyName,company_address:e.address,company_tax_id:e.taxId,letter_date:TODAY,fee:e.fee,approaches:e.approaches.slice()};
+  const ent=defaultEntity(e.country);
+  if(level>=0){e.depositInvoice={seq:0,trigger:'Call 1 deposit',desc:'Refundable Deposit for Business Valuation Assessment',amount:500,currency:'EUR',entity:ent,number:engNextInvNo(ent),status:'issued',issued:e.t0||'1 Sep',due:'+7 days',link:'https://book.stripe.com/6oU5kx8AKc3I7t799d2sM00'};e.activity.push({t:e.t0||'1 Sep',m:`Deposit invoice #${e.depositInvoice.number} issued by ${ENTITY_DETAIL[ent].name}`});}
+  if(level>=1){e.deposit={status:'paid',intent:'pi_3Q'+e.id.slice(-4),paid_at:e.t1||'2 Sep'};e.depositInvoice.status='paid';e.activity.push({t:e.t1||'2 Sep',m:'Stripe webhook: €500 deposit paid'});}
+  if(level>=2){e.nda={status:'signed',sent_at:e.t1||'2 Sep',signed_at:e.t2||'3 Sep',signer:{name:e.contactName,ip:'85.72.14.9',sha:'sha256:9f2c…e41a'}};e.activity.push({t:e.t2||'3 Sep',m:'NDA signed by '+e.contactName});}
+  else if(level===1&&e.ndaSent){e.nda={status:'sent',sent_at:e.t1||'2 Sep'};}
+  if(level>=3){e.docs.forEach(d=>d.up=e.t3||'4 Sep');e.activity.push({t:e.t3||'4 Sep',m:'Financials complete — Call 2 unlocked'});}
+  else if(level===2&&e.docsUp){e.docs.slice(0,e.docsUp).forEach(d=>d.up=e.t2||'3 Sep');}
+  if(level>=4){e.call2={held:e.t4||'5 Sep',outcome:'proceed'};e.fathom2='https://fathom.video/share/c2';e.activity.push({t:e.t4||'5 Sep',m:'Call 2 held — client agreed to full valuation'});}
+  if(level>=5){e.el.status='signed';e.el.version=1;e.el.sent_at=e.t5||'5 Sep';e.el.signed_at=e.t5||'5 Sep';e.el.signer={name:e.contactName,ip:'85.72.14.9',sha:'sha256:4b7d…c902'};e.deposit.status='credited';const s=schedule(e.fee);e.invoices=[{seq:1,trigger:'On signing',desc:'Business Valuation — 50% on signing of the engagement letter, less €500 deposit paid',amount:s.inv1,currency:'EUR',status:'scheduled',entity:ent},{seq:2,trigger:'On final report',desc:'Business Valuation — balance on delivery of the final report',amount:s.inv2,currency:'EUR',status:'scheduled',entity:ent}];e.activity.push({t:e.t5||'5 Sep',m:'Engagement letter signed · deposit credited · invoices scheduled'});}
+  if(level>=6){const i=e.invoices[0];i.status='issued';i.number=engNextInvNo(ent);i.ref='#'+i.number;i.issued=e.t5||'5 Sep';i.due='+15 days';}
+  if(level>=7){e.invoices[0].status='paid';e.invoices[0].paid=e.t7||'6 Sep';}
+  if(o.declined){e.call2={held:e.t4||'2 Sep',outcome:'declined'};e.deposit.status='refunded';e.depositInvoice.status='refunded';e.activity.push({t:e.t4||'2 Sep',m:'Client declined after Call 2 — deposit refunded'});}
+  e.activity.reverse();
+  return e;
+}
+function seedEngagements(){
+  DB.engagements=[
+    mkEng({id:'ENG-0142',code:'ENG-0142',lead:'L14',contactName:'Maria Kotsovou',contactTitle:'Managing Director',email:'maria@aegeanmarine.gr',companyName:'Aegean Marine Supplies Ltd',address:'Leoforos Vouliagmenis 112, Glyfada 166 74, Athens',country:'Greece',taxId:'EL099887766',fee:5000,t0:'28 Aug',t1:'29 Aug',t2:'30 Aug',t3:'3 Sep',t4:'5 Sep'},4),
+    mkEng({id:'ENG-0141',code:'ENG-0141',client:'CLI-0092',contactName:'Nikos Delis',email:'nikos@delphi.io',companyName:'Delphi Analytics Ltd',address:'Arch. Makariou III 155, Limassol 3026',country:'Cyprus',taxId:'CY10412331P',fee:24000,approaches:['dcf','cca','pt','nav'],t0:'20 Aug',t1:'21 Aug',t2:'22 Aug',t3:'28 Aug',t4:'1 Sep',t5:'2 Sep'},6),
+    mkEng({id:'ENG-0140',code:'ENG-0140',client:'CLI-0083',contactName:'Andreas Pavlou',email:'a.pavlou@aegisfoods.com',companyName:'Aegis Foods Ltd',address:'Industrial Area, Larnaca 7100',country:'Cyprus',taxId:'CY10233990W',fee:0,docsUp:2,t0:'25 Aug',t1:'26 Aug',t2:'27 Aug'},2),
+    mkEng({id:'ENG-0139',code:'ENG-0139',client:'CLI-0093',contactName:'James Whitfield',email:'jw@sablecapital.co.uk',companyName:'Sable Capital LLP',address:'22 Bishopsgate, London EC2N 4BQ',country:'United Kingdom',taxId:'GB 402 7761 08',fee:0,ndaSent:true,t0:'1 Sep',t1:'2 Sep'},1),
+    mkEng({id:'ENG-0138',code:'ENG-0138',lead:'L12',contactName:'Zlatko Adzovic',email:'zlatko@hidesign.ba',companyName:'Hidesign Sarajevo doo',address:'Vladislava Skarica 10, 71000 Sarajevo',country:'Bosnia and Herzegovina',taxId:'4200488080001',fee:0,t0:'4 Sep'},0),
+    mkEng({id:'ENG-0137',code:'ENG-0137',contactName:'Lena Fischer',email:'lf@northwind-log.de',companyName:'Northwind Logistics GmbH',address:'Hafenstraße 4, 20457 Hamburg',country:'Germany',taxId:'DE 311 998 402',fee:0,declined:true,t0:'18 Aug',t1:'19 Aug',t2:'20 Aug',t3:'26 Aug',t4:'29 Aug'},3),
+  ];
+  // link leads
+  DB.engagements.forEach(e=>{if(e.lead){const l=DB.leads.find(x=>x.id===e.lead);if(l){l.eng=e.id;l.company=e.companyName.replace(/ (Ltd|LLP|GmbH|doo)$/,'');l.service='valuation';l.fee=e.fee||l.fee;l.stage=engStage(e)==='proposal'?'proposal':'engaged';l.tag=null;}}});
+}
+function openEngagement(l){
+  const id='ENG-0'+(DB.nextEng++);
+  const e=mkEng({id,code:id,lead:l.id,contactName:'Primary contact',email:'contact@'+l.company.toLowerCase().replace(/[^a-z]/g,'')+'.com',companyName:l.company+' Ltd',address:'—',country:'Cyprus',taxId:'—',fee:l.fee||0},-1);
+  DB.engagements.unshift(e); l.eng=id; l.stage='engaged'; l.tag=null;
+  engLog(e,'Engagement opened from GHL opportunity — Call 1 booked');
+  go('#/engagement/'+id); toast(`<b>${id}</b> opened. First step: raise the €500 deposit invoice.`,'ok');
+}
+
+/* ---- actions ---- */
+function raiseDepositInvoice(id){const e=eng(id);const ent=defaultEntity(e.country);e.depositInvoice={seq:0,trigger:'Call 1 deposit',desc:'Refundable Deposit for Business Valuation Assessment',amount:500,currency:'EUR',entity:ent,number:engNextInvNo(ent),status:'issued',issued:NOW,due:'+7 days',link:'https://book.stripe.com/6oU5kx8AKc3I7t799d2sM00'};engLog(e,`Deposit invoice #${e.depositInvoice.number} issued by ${ENTITY_DETAIL[ent].name} with Stripe link`);toast(`Deposit invoice #${e.depositInvoice.number} generated and emailed with the Stripe link.`,'ok');render();}
+function payDeposit(id){const e=eng(id);e.deposit={status:'paid',intent:'pi_3Q'+Math.random().toString(36).slice(2,8),paid_at:NOW};if(e.depositInvoice)e.depositInvoice.status='paid';engLog(e,'Stripe webhook: €500 deposit paid');toast('<b>Deposit paid.</b> Stripe webhook received — NDA step unlocked.','ok');render();}
+function refundDeposit(id){const e=eng(id);e.deposit.status='refunded';if(e.depositInvoice)e.depositInvoice.status='refunded';engLog(e,'Deposit refunded via Stripe');toast('Deposit refunded to the client.','ok');render();}
+function generateNDA(id){const e=eng(id);if(e.deposit.status==='pending')return toast('<b>Gate:</b> the €500 deposit must be paid before the NDA is issued.','err');e.nda={status:'draft',data:{client_name:e.contactName,is_individual:e.isIndividual,client_address:e.address,client_country:e.country,nda_date:TODAY}};engLog(e,'NDA generated from locked template (nda-2026-09)');toast('NDA generated. Preview below — send when happy.');render();}
+function sendNDA(id){const e=eng(id);e.nda.status='sent';e.nda.sent_at=NOW;engLog(e,'NDA emailed to '+e.email+' with portal sign link');toast('NDA sent. The client signs it on the portal.','ok');render();}
+function clientSign(id,kind){const e=eng(id);const a=e[kind];const exp=e.contactName;
+  if((S.portalName||'').trim().toLowerCase()!==exp.toLowerCase())return toast(`Type your name exactly as it appears on the document: <b>${esc(exp)}</b>`,'err');
+  if(!S.portalAgree)return toast('Tick the acceptance box to sign.','err');
+  a.status='signed';a.signed_at=NOW;a.signer={name:S.portalName,ip:'85.72.14.9',ua:'Safari 19 · macOS',sha:'sha256:'+Math.random().toString(16).slice(2,6)+'…'+Math.random().toString(16).slice(2,6)};S.portalName='';S.portalAgree=false;
+  engLog(e,(kind==='nda'?'NDA':'Engagement letter')+' signed by '+a.signer.name+' — countersigned PDF + audit page stored');
+  DB.documents.unshift({name:(kind==='nda'?'NDA':'Engagement letter')+' — '+e.companyName+' (signed).pdf',kind:kind==='nda'?'nda':'eng_letter',project:e.code,client:e.companyName,v:1,by:a.signer.name+' (portal)',vis:'client',date:'Just now',sig:'signed'});
+  if(kind==='el'){e.deposit.status='credited';const s=schedule(e.el.data.fee);const ent=defaultEntity(e.country);e.invoices=[{seq:1,trigger:'On signing',desc:'Business Valuation — 50% on signing of the engagement letter, less €500 deposit paid',amount:s.inv1,currency:'EUR',status:'scheduled',entity:ent},{seq:2,trigger:'On final report',desc:'Business Valuation — balance on delivery of the final report',amount:s.inv2,currency:'EUR',status:'scheduled',entity:ent}];e.fee=e.el.data.fee;engLog(e,'Deposit credited against Invoice 1 · invoice schedule created · issuer '+ENTITY_DETAIL[ent].name);
+    }
+  toast('<b>Signed.</b> Countersigned PDF generated and filed under Documents.','ok');render();}
+function engUpload(id,i){const e=eng(id);e.docs[i].up=NOW;engLog(e,'Client uploaded: '+e.docs[i].l);DB.documents.unshift({name:e.docs[i].l+'.pdf',kind:'fs',project:e.code,client:e.companyName,v:1,by:e.contactName+' (portal)',vis:'client',date:'Just now'});render();}
+function recordCall2(id,outcome){const e=eng(id);if(!ESTEPS[2].done(e))return toast('<b>Gate:</b> required financials are still missing — the six-page review needs them.','err');e.call2={held:NOW,outcome};e.fathom2='https://fathom.video/share/c2';
+  if(outcome==='declined'){e.deposit.status='refunded';if(e.depositInvoice)e.depositInvoice.status='refunded';engLog(e,'Client declined after Call 2 — deposit refunded, GHL opportunity → Lost');const l=e.lead&&DB.leads.find(x=>x.id===e.lead);if(l){l.stage='lost';l.reason='declined after review';}toast('Marked as declined. Deposit refund issued via Stripe.','ok');}
+  else{engLog(e,'Call 2 held — client agreed to full valuation');const l=e.lead&&DB.leads.find(x=>x.id===e.lead);if(l)l.stage='proposal';toast('Call 2 recorded. Draft the engagement letter.','ok');S.engSel=4;}render();}
+function setEL(id,k,v){eng(id).el.data[k]=k==='fee'?Number(v):v;render();}
+function toggleAppr(id,a){const arr=eng(id).el.data.approaches;const i=arr.indexOf(a);i<0?arr.push(a):arr.splice(i,1);render();}
+function generateEL(id){const e=eng(id);const d=e.el.data;if(!(e.call2.held&&e.call2.outcome==='proceed'))return toast('<b>Gate:</b> record Call 2 with outcome "proceed" first.','err');if(!d.approaches.length)return toast('Pick at least one valuation approach.','err');if(!(d.fee>0))return toast('Enter the professional fee.','err');e.el.version++;e.el.status='draft';engLog(e,`Engagement letter v${e.el.version} generated (template el-2026-09) — fee ${money(d.fee)}, ${approachLines(d.approaches).length} approach line(s)`);toast(`Engagement letter v${e.el.version} generated. Fields locked; unlock to edit and regenerate.`);render();}
+function unlockEL(id){eng(id).el.status='none';render();}
+function sendEL(id){const e=eng(id);e.el.status='sent';e.el.sent_at=NOW;engLog(e,'Engagement letter emailed to '+e.email+' with portal sign link');toast('Engagement letter sent.','ok');render();}
+function setEntity(id,seq,code){const i=eng(id).invoices.find(x=>x.seq===seq);i.entity=code;if(code==='CY')i.currency='EUR';render();}
+function setCurrency(id,seq,c){eng(id).invoices.find(x=>x.seq===seq).currency=c;render();}
+function previewInvoice(id,seq){S.preview={id,seq};render();}
+function engIssue(id,seq){const e=eng(id);const i=e.invoices.find(x=>x.seq===seq);i.status='issued';i.number=engNextInvNo(i.entity);i.ref='#'+i.number;i.issued=NOW;i.due='+15 days';engLog(e,`Invoice ${seq} issued as ${ENTITY_DETAIL[i.entity].name} #${i.number} — PDF emailed, due in 15 days`);toast(`Invoice #${i.number} generated and emailed.`,'ok');render();}
+function engPaid(id,seq){const e=eng(id);const i=e.invoices.find(x=>x.seq===seq);i.status='paid';i.paid=NOW;engLog(e,`Invoice ${seq} paid`);render();}
+function startValuation(id){const e=eng(id);if(e.el.status!=='signed')return toast('<b>Gate:</b> engagement letter not signed.','err');const i1=e.invoices.find(x=>x.seq===1);if(!i1||i1.status!=='paid')return toast('<b>Gate:</b> Invoice 1 must be paid before work starts.','err');
+  const code=winEngagement(e);e.project=code;engLog(e,`Valuation started — ${code} created from the Valuation template`);toast(`<b>Valuation started.</b> ${code} created: 6 stages, task list, data top-up checklist. Invoice 2 scheduled for the final report.`,'ok');go('#/project/'+code);}
+
+/* ---- screens ---- */
+function engagementsList(r){
+  const f=r.q.filter||'live';
+  let list=DB.engagements.slice(); if(f==='live')list=list.filter(e=>!['declined','valuation_active'].includes(engStage(e)));else if(f==='started')list=list.filter(e=>engStage(e)==='valuation_active');else if(f==='declined')list=list.filter(e=>engStage(e)==='declined');
+  const pills=[['live','In progress'],['started','Valuation started'],['declined','Declined'],['all','All']].map(([v,l])=>`<span class="pill${f===v?' active':''}" onclick="go('#/engagements?filter=${v}')">${l}</span>`).join('');
+  const kp=s=>DB.engagements.filter(e=>engStage(e)===s).length;
+  const strip=`<div class="kpis" style="grid-template-columns:repeat(4,1fr)"><div class="kpi" onclick="go('#/engagements')"><div class="l">Awaiting deposit / NDA</div><div class="v">${kp('deposit_pending')+kp('nda_pending')}</div><div class="d muted">after Call 1</div></div><div class="kpi" onclick="go('#/engagements')"><div class="l">Awaiting financials</div><div class="v">${kp('docs_pending')}</div><div class="d muted">chased every 3 working days</div></div><div class="kpi${kp('proposal')?' attn':''}" onclick="go('#/engagements')"><div class="l">Proposal — letter pending</div><div class="v">${kp('proposal')}</div><div class="d muted">after Call 2</div></div><div class="kpi" onclick="go('#/engagements')"><div class="l">Engaged — Invoice 1 due</div><div class="v">${kp('engaged')}</div><div class="d muted">valuation starts on payment</div></div></div>`;
+  const rows=list.map(e=>{const st=engStage(e);const [lab,cl]=ESTAGE[st];const cur=engCur(e);const nxt=st==='declined'?'—':st==='valuation_active'?`<a href="#/project/${e.project}">${e.project}</a>`:ESTEPS[cur].n;return `<div class="trow click" style="grid-template-columns:.7fr 1.4fr .8fr 1.2fr .9fr .7fr .6fr" onclick="go('#/engagement/${e.id}')"><span>${e.code}</span><span>${esc(e.companyName)}<div class="sub11">${esc(e.contactName)} · ${esc(e.country)}</div></span><span class="muted">${defaultEntity(e.country)==='CY'?'Consortia Ltd':'Consortia LLP'}</span><span><span class="chip ${cl}">${lab}</span></span><span class="muted">${nxt}</span><span>${e.fee?money(e.fee):'<span class="ghost">—</span>'}</span><span class="muted">${e.deposit.status}</span></div>`;}).join('');
+  return `<div class="col">${strip}<div class="toolbar"><div class="pills">${pills}</div><div class="spacer"></div><span class="hint">Engagements open from a lead at "Call 1 booked" — see Leads.</span></div><div class="card rounded"><div class="thead" style="grid-template-columns:.7fr 1.4fr .8fr 1.2fr .9fr .7fr .6fr">Code<span>Client</span><span>Invoicing entity</span><span>Stage</span><span>Next step</span><span>Fee</span><span>Deposit</span></div>${rows||'<div class="empty" style="margin:14px">No engagements.</div>'}</div></div>`;
+}
+function engagementDetail(r){
+  const e=eng(r.id); if(!e)return '<div class="empty">Engagement not found.</div>';
+  const cur=engCur(e); if(S.engSel==null||S.engId!==e.id){S.engSel=cur;S.engId=e.id;}
+  const st=engStage(e); const [lab,cl]=ESTAGE[st]; const fee=e.el.data.fee||e.fee;
+  const collected=(['paid','credited'].includes(e.deposit.status)?DEPOSIT:0)+e.invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+i.amount,0);
+  const ent=defaultEntity(e.country);
+  return `<div class="col">
+  <div class="ehead"><div><div style="font:600 22px Newsreader,serif">${esc(e.companyName)}</div><div class="sub11">${esc(e.contactName)}, ${esc(e.contactTitle)} · ${esc(e.email)} · ${esc(e.country)} → invoiced by ${ENTITY_DETAIL[ent].name}</div><div style="margin-top:8px;display:flex;gap:6px"><span class="chip ${cl}">${lab}</span><span class="chip">stage: ${st}</span>${e.lead?`<span class="chip" style="cursor:pointer" onclick="go('#/leads')">GHL ${e.lead}</span>`:''}${e.project?`<span class="chip brand" style="cursor:pointer" onclick="go('#/project/${e.project}')">${e.project}</span>`:''}</div></div>
+    <div class="money"><div><span class="l">Fee${e.el.status==='signed'?'':' (proposed)'}</span><span class="v">${fee?money(fee):'—'}</span></div><div><span class="l">Collected</span><span class="v">${money(collected)}</span></div><div><span class="l">Outstanding</span><span class="v">${fee?money(fee-collected):'—'}</span></div></div></div>
+  <div class="stepper">${ESTEPS.map((s,i)=>`<div class="step ${s.done(e)?'done':''} ${i===cur?'cur':''} ${st==='declined'&&i===3?'blk':''}" onclick="S.engSel=${i};render()"><div class="bar"></div><div class="lb"${i===S.engSel?' style="text-decoration:underline;text-underline-offset:4px"':''}>${i+1}. ${s.n}${s.done(e)?' ✓':i===cur?' ●':''}</div></div>`).join('')}</div>
+  <div class="cols"><div>${[stepDeposit,stepNDA,stepDocs,stepCall2,stepEL,stepStart][S.engSel](e)}</div><div>${engRight(e)}</div></div></div>`;
+}
+function stepDeposit(e){const d=e.deposit,inv=e.depositInvoice;return `<div class="card pad"><div class="h14">Call 1 — refundable deposit</div><div class="sub11" style="margin:2px 0 12px">€500 invoiced in Call 1 with a Stripe link. Refunded if the client doesn't proceed; credited against Invoice 1 if they do.</div>
+  <div class="kv"><span class="k">Status</span><span class="chip ${d.status==='pending'?'attn':d.status==='refunded'?'':'accent'}">${d.status}</span></div>
+  <div class="kv"><span class="k">Deposit invoice</span><span>${inv?`<a href="#" onclick="previewInvoice('${e.id}',0);return false">${ENTITY_DETAIL[inv.entity].name} #${inv.number} ↗</a> · ${inv.status}`:'<span class="ghost">not raised</span>'}</span></div>
+  ${d.intent?`<div class="kv"><span class="k">Stripe payment intent</span><span>${d.intent} · paid ${d.paid_at}</span></div>`:''}
+  <div class="kv"><span class="k">Call 1 recording</span><a href="#" onclick="return false">Fathom · Call 1 ↗</a></div>
+  <div class="toolbar" style="margin-top:14px">${d.status==='pending'?(inv?`<button class="btn primary" onclick="payDeposit('${e.id}')">Simulate Stripe webhook: paid</button><span class="hint">Client pays via the link on the invoice or the portal button.</span>`:`<button class="btn primary" onclick="raiseDepositInvoice('${e.id}')">Raise deposit invoice (€500, Stripe link)</button><span class="hint">Issued in EUR by ${ENTITY_DETAIL[defaultEntity(e.country)].name} (client in ${esc(e.country)}), due in 7 days.</span>`):d.status==='paid'?`<button class="btn" style="color:var(--danger)" onclick="refundDeposit('${e.id}')">Refund deposit</button><span class="hint">Only if the client walks away before Call 2.</span>`:`<span class="hint">Deposit ${d.status}.</span>`}</div></div>`;}
+function stepNDA(e){const n=e.nda;const gate=e.deposit.status==='pending';const lock=n.status!=='none';return `<div class="card pad"><div class="h14">Non-disclosure agreement</div><div class="sub11" style="margin:2px 0 12px">Generated from the locked NDA template. Only the party details and date change.</div>
+  ${gate?`<div class="gate hard" style="margin-bottom:12px">⛔ Gate — deposit not paid. The NDA is issued only after the €500 lands.</div>`:''}
+  <div class="form"><label class="field">Receiving party (signatory)<input value="${esc(e.contactName)}" ${lock?'disabled':''} oninput="eng('${e.id}').contactName=this.value"></label>
+  <div class="field">Party type<div class="toggle"><button class="${!e.isIndividual?'on':''}" ${lock?'disabled':''} onclick="eng('${e.id}').isIndividual=false;render()">Company</button><button class="${e.isIndividual?'on':''}" ${lock?'disabled':''} onclick="eng('${e.id}').isIndividual=true;render()">Individual</button></div></div>
+  <label class="field w">${e.isIndividual?'Main address':'Head office address'}<input value="${esc(e.address)}" ${lock?'disabled':''} oninput="eng('${e.id}').address=this.value"></label>
+  ${e.isIndividual?'':`<label class="field">Country of incorporation<input value="${esc(e.country)}" ${lock?'disabled':''} oninput="eng('${e.id}').country=this.value"></label>`}
+  <label class="field">Agreement date<input type="date" value="${TODAY}" disabled></label></div>
+  <div class="toolbar" style="margin-top:14px">${n.status==='none'?`<button class="btn primary" onclick="generateNDA('${e.id}')" ${gate?'disabled':''}>Generate NDA</button>`:n.status==='draft'?`<button class="btn primary" onclick="sendNDA('${e.id}')">Send to client for signing</button><button class="btn" onclick="eng('${e.id}').nda.status='none';render()">Edit details</button>`:n.status==='sent'?`<span class="chip attn">Sent ${n.sent_at} — awaiting signature</span><button class="btn sm" onclick="toast('Reminder email sent.')">Send reminder</button><button class="btn sm" onclick="S.portalEng='${e.id}';go('#/portal')">Open portal as client</button>`:`<span class="chip accent">Signed ${n.signed_at} by ${esc(n.signer.name)}</span><button class="btn sm">Download signed PDF</button>`}</div>
+  ${n.status!=='none'?`<div class="doc small" style="margin-top:14px"><h4>Mutual Non-Disclosure Agreement</h4><p>This Mutual Non-Disclosure Agreement (the "Agreement") is made and effective <b><mark>${longDate(TODAY)}</mark></b>, <b>BETWEEN: Kyriacos Papademetriou</b> (the "Disclosing Party"), on behalf of CONSORTIA LTD, a corporation organized and existing under the laws of the Republic of Cyprus, with its head office located at: Efesou 9, Paralimni, 5280, Cyprus</p><p><b>AND: <mark>${esc(e.contactName)}</mark></b> (the "Receiving Party"), ${e.isIndividual?`an individual with his main address located at <mark>${esc(e.address)}</mark>`:`a corporation organized and existing under the laws of <mark>${esc(e.country)}</mark> with its head office located at <mark>${esc(e.address)}</mark>`}</p><p class="ghost">… 16 clauses unchanged from the master template …</p></div>`:''}</div>`;}
+function stepDocs(e){const gate=e.nda.status!=='signed';return `<div class="card pad"><div class="h14">Financials from the client</div><div class="sub11" style="margin:2px 0 12px">Upload checklist on the portal. Unlocks after the NDA is signed. Call 2 can't be booked until every required item is in.</div>
+  ${gate?`<div class="gate hard" style="margin-bottom:12px">⛔ Gate — NDA not signed. Uploads stay locked on the portal.</div>`:''}
+  <div class="dl">${e.docs.map((d,i)=>`<div class="d ${d.up?'up':''}"><span>${d.up?'✓':'○'}</span><span>${esc(d.l)}${d.req===false?' <span class="hint">(optional)</span>':''}</span><span class="st">${d.up?'uploaded '+d.up:gate?'locked':'waiting'}</span>${!d.up&&!gate?`<button class="btn sm" onclick="engUpload('${e.id}',${i})">Simulate upload</button>`:''}</div>`).join('')}</div>
+  <div class="hint" style="margin-top:10px">Each upload lands in Documents under the client, tagged "pre-engagement". A chase email goes out every 3 working days for missing required items.</div></div>`;}
+function stepCall2(e){const c=e.call2;const gate=!ESTEPS[2].done(e);return `<div class="card pad"><div class="h14">Call 2 — six-page review</div><div class="sub11" style="margin:2px 0 12px">Present the review, sell the full valuation, record the outcome. The outcome drives what happens to the deposit.</div>
+  ${gate?`<div class="gate hard" style="margin-bottom:12px">⛔ Gate — required financials missing. The review can't be prepared without them.</div>`:''}
+  <div class="kv"><span class="k">Six-page review</span><span>${ESTEPS[2].done(e)?'<a href="#" onclick="return false">Six-page review v1.pdf ↗</a>':'<span class="ghost">not yet prepared</span>'}</span></div>
+  <div class="kv"><span class="k">Call 2 recording</span><span>${c.held?'<a href="#" onclick="return false">Fathom · Call 2 ↗</a>':'<span class="ghost">attaches automatically after the call</span>'}</span></div>
+  <div class="kv"><span class="k">Outcome</span><span>${c.held?`<span class="chip ${c.outcome==='proceed'?'accent':''}">${c.outcome} · ${c.held}</span>`:'—'}</span></div>
+  <div class="toolbar" style="margin-top:14px">${c.held?`<span class="hint">${c.outcome==='proceed'?'Client agreed. Next: engagement letter.':'Client declined. Deposit refunded, GHL opportunity moved to Lost.'}</span>`:`<button class="btn primary" onclick="recordCall2('${e.id}','proceed')" ${gate?'disabled':''}>Client agreed — proceed</button><button class="btn" style="color:var(--danger)" onclick="recordCall2('${e.id}','declined')" ${gate?'disabled':''}>Client declined — refund deposit</button>`}</div></div>`;}
+function stepEL(e){const d=e.el.data,st=e.el.status,lock=st!=='none',sch=schedule(d.fee||0),lines=approachLines(d.approaches),gate=!(e.call2.held&&e.call2.outcome==='proceed');
+  return `<div class="card pad"><div class="h14">Engagement letter</div><div class="sub11" style="margin:2px 0 12px">Generated from the locked master letter. You choose the approaches and the fee; everything else comes from the client record.</div>
+  ${gate?`<div class="gate hard" style="margin-bottom:12px">⛔ Gate — Call 2 not recorded with outcome "proceed".</div>`:st==='signed'?`<div class="gate" style="margin-bottom:12px;background:var(--sunken)">✓ Signed ${e.el.signed_at} by ${esc(e.el.signer.name)} · ${e.el.signer.ip} · ${e.el.signer.sha}. This version is immutable.</div>`:''}
+  <div class="field" style="margin-bottom:12px"><span>Valuation approaches in §2 Scope of services</span><div class="appr">${APPROACHES.map(a=>`<button class="ap ${d.approaches.includes(a.id)?'on':''}" ${lock?'disabled':''} onclick="toggleAppr('${e.id}','${a.id}')"><span class="bx">${d.approaches.includes(a.id)?'✓':''}</span><span><div class="n">${a.n}</div><div class="d">${a.d}</div></span></button>`).join('')}</div><div class="hint">${d.approaches.includes('cca')&&d.approaches.includes('pt')?'Both market methods selected → they print as the single line from the master letter.':'The letter prints one bullet per selected approach.'}</div></div>
+  <div class="form"><label class="field">Professional fee (EUR, no VAT)<input type="number" step="100" value="${d.fee||''}" ${lock?'disabled':''} oninput="setEL('${e.id}','fee',this.value)"></label><label class="field">Letter date<input type="date" value="${d.letter_date}" ${lock?'disabled':''} oninput="setEL('${e.id}','letter_date',this.value)"></label><label class="field">Signatory<input value="${esc(d.client_name)}" ${lock?'disabled':''} oninput="setEL('${e.id}','client_name',this.value)"></label><label class="field">Signatory title<input value="${esc(d.client_title)}" ${lock?'disabled':''} oninput="setEL('${e.id}','client_title',this.value)"></label><label class="field">Company<input value="${esc(d.company_name)}" ${lock?'disabled':''} oninput="setEL('${e.id}','company_name',this.value)"></label><label class="field">Tax ID<input value="${esc(d.company_tax_id)}" ${lock?'disabled':''} oninput="setEL('${e.id}','company_tax_id',this.value)"></label><label class="field w">Address<input value="${esc(d.company_address)}" ${lock?'disabled':''} oninput="setEL('${e.id}','company_address',this.value)"></label></div>
+  <div class="inv" style="margin:14px 0"><span>Deposit (paid in Call 1)</span><span class="t">credited on signing</span><span class="a">${money(DEPOSIT)}</span><span>Invoice 1 — 50%${sch.half<(d.fee||0)*.5?' capped at €5,000':''} less deposit</span><span class="t">on signing</span><span class="a">${money(sch.inv1)}</span><span>Invoice 2 — balance</span><span class="t">on final report</span><span class="a">${money(sch.inv2)}</span></div>
+  <div class="toolbar">${st==='none'?`<button class="btn primary" onclick="generateEL('${e.id}')" ${gate?'disabled':''}>Generate letter${e.el.version?' v'+(e.el.version+1):''}</button>`:st==='draft'?`<button class="btn primary" onclick="sendEL('${e.id}')">Send to client for signing</button><button class="btn" onclick="unlockEL('${e.id}')">Unlock &amp; edit</button><button class="btn">Download .docx</button>`:st==='sent'?`<span class="chip attn">Sent ${e.el.sent_at} — awaiting signature</span><button class="btn sm" onclick="toast('Reminder email sent.')">Send reminder</button><button class="btn sm" onclick="S.portalEng='${e.id}';go('#/portal')">Open portal as client</button>`:`<button class="btn">Download signed PDF</button><button class="btn" onclick="S.engSel=5;render()">Go to invoicing →</button>`}</div>
+  <div style="margin-top:14px">${letterPreview(d,lines)}</div></div>`;}
+function letterPreview(d,lines){return `<div class="doc"><p><b><mark>${esc(d.client_name)}</mark></b><br><mark>${esc(d.company_name)}</mark><br><mark>${esc(d.company_address)}</mark><br>Tax ID <mark>${esc(d.company_tax_id)}</mark></p><p>Date: <mark>${longDate(d.letter_date)}</mark></p><p>Dear <mark>${esc(d.client_name)}</mark>,</p><p>Consortia Ltd ("<b>we</b>" or the "<b>Advisor</b>") is pleased to engage with <mark>${esc(d.client_name)}</mark> (the "<b>Client</b>" / "<b>Company</b>") to provide professional valuation services. …</p><p class="sec">2. Scope of services</p><ul><li>Conducting a thorough analysis of the financial, operational, and market data relevant to the subject entity.</li><li>Applying appropriate valuation methodologies, such as:<ul>${lines.length?lines.map(l=>`<li><mark>${l}</mark></li>`).join(''):'<li class="danger">— no approach selected —</li>'}<li>Preparing a detailed valuation report that outlines our findings, assumptions, and conclusions</li></ul></li></ul><p class="sec">5. Fees &amp; Payment Terms</p><p>The total professional fee for this engagement is <mark>EUR €${Number(d.fee||0).toLocaleString('en-GB')}</mark>, plus any reasonable out-of-pocket expenses. Payments will be structured as follows:</p><ul><li>50% upon signing this engagement letter.</li><li>50% upon delivery of the final report.</li></ul><p>The 50% prepayment which is upon signing this engagement letter it should be the 50% of the total professional fee for the engagement with a limit of €5,000.</p><p class="ghost">… sections 1, 3, 4, 6–10 and Schedules 1–2 unchanged from the master letter …</p><p>I accept the terms of the agreement; as referred in Schedule 1 and 2 of this letter; and confirm that I am authorised to sign for and on behalf of <mark>${esc(d.client_name.toUpperCase())}</mark>.</p><p><i><mark>${esc(d.client_name)}</mark><br><mark>${esc(d.client_title)}</mark></i><br><mark>${longDate(d.letter_date)}</mark></p></div>`;}
+function stepStart(e){const i1=e.invoices.find(i=>i.seq===1);const gate=e.el.status!=='signed';return `<div class="card pad"><div class="h14">Invoice 1 and start</div><div class="sub11" style="margin:2px 0 12px">The platform generates the invoice PDF in your layout and emails it. Issuing company follows the country rule (UK client → Consortia Ltd, everyone else → the LLP); the matching bank account prints on the invoice. No VAT.</div>
+  ${gate?`<div class="gate hard" style="margin-bottom:12px">⛔ Gate — engagement letter not signed. No invoice until it is.</div>`:''}
+  ${e.invoices.length?e.invoices.map(i=>{const en=ENTITY_DETAIL[i.entity],bk=BANKS[i.entity+'-'+i.currency];return `<div class="invc"><div class="inv" style="margin:0"><span><b>Invoice ${i.seq}</b> — ${i.trigger}${i.ref?' · '+i.ref:''}${i.due?' · due '+i.due:''}</span><span>${i.status==='scheduled'?(i.seq===1?`<button class="btn sm primary" onclick="engIssue('${e.id}',1)">Mark issued</button>`:'<span class="chip">after final report</span>'):i.status==='issued'?`<button class="btn sm" onclick="engPaid('${e.id}',${i.seq})">Mark paid</button>`:`<span class="chip accent">paid ${i.paid}</span>`}</span><span class="a">${money(i.amount,i.currency)}</span></div>
+    <div class="ent"><span class="k">Issued by</span><div class="toggle"><button class="${i.entity==='CY'?'on':''}" ${i.status!=='scheduled'?'disabled':''} onclick="setEntity('${e.id}',${i.seq},'CY')">Consortia Ltd · Cyprus</button><button class="${i.entity==='UK'?'on':''}" ${i.status!=='scheduled'?'disabled':''} onclick="setEntity('${e.id}',${i.seq},'UK')">Consortia Advisory LLP · UK</button></div><span class="hint">${i.entity===defaultEntity(e.country)?'auto — client in '+esc(e.country):'overridden'}</span><span class="k" style="margin-left:auto">Currency</span><div class="toggle"><button class="${i.currency==='EUR'?'on':''}" ${i.status!=='scheduled'?'disabled':''} onclick="setCurrency('${e.id}',${i.seq},'EUR')">EUR</button>${i.entity==='UK'?`<button class="${i.currency==='GBP'?'on':''}" ${i.status!=='scheduled'?'disabled':''} onclick="setCurrency('${e.id}',${i.seq},'GBP')">GBP</button>`:''}</div><button class="btn sm" onclick="previewInvoice('${e.id}',${i.seq})">Preview</button></div>
+    <div class="entd">${en.name} · ${en.addr} · IBAN ${bk.iban} · BIC ${bk.swift} · <b>No VAT</b></div></div>`;}).join(''):`<div class="hint">The schedule appears the moment the letter is signed.</div>`}
+  <div class="toolbar" style="margin-top:14px"><button class="btn primary" onclick="startValuation('${e.id}')" ${gate||!i1||i1.status!=='paid'||e.project?'disabled':''}>${e.project?'Valuation started → '+e.project:'Start valuation'}</button><span class="hint">Creates the project from the Valuation template; the 10-working-day clock starts when the data top-up is complete.</span></div></div>`;}
+function engRight(e){return `<div class="card pad"><div class="h14" style="margin-bottom:8px">Agreements</div>
+  <div class="kv"><span class="k">NDA</span><span class="chip ${e.nda.status==='signed'?'accent':e.nda.status==='none'?'':'attn'}">${e.nda.status==='none'?'not generated':e.nda.status}</span></div>
+  <div class="kv"><span class="k">Engagement letter${e.el.version?' v'+e.el.version:''}</span><span class="chip ${e.el.status==='signed'?'accent':e.el.status==='none'?'':'attn'}">${e.el.status==='none'?'not generated':e.el.status}</span></div>
+  <div class="kv"><span class="k">Deposit</span><span class="chip ${e.deposit.status==='pending'?'attn':e.deposit.status==='refunded'?'':'accent'}">${e.deposit.status}</span></div>
+  <div class="kv"><span class="k">Approaches</span><span>${e.el.data.approaches.map(a=>a.toUpperCase()).join(' · ')||'—'}</span></div>
+  <div class="h14" style="margin:18px 0 8px">Activity</div><div class="tl">${e.activity.length?e.activity.slice(0,9).map(l=>`<div><span>${l.t}</span><span>${l.m}</span></div>`).join(''):'<span class="hint">Nothing yet.</span>'}</div></div>`;}
+function invoiceDoc(e,i){const en=ENTITY_DETAIL[i.entity],bk=BANKS[i.entity+'-'+i.currency],sym=i.currency==='GBP'?'£':'€',m=n=>sym+Number(n).toLocaleString('en-GB',{minimumFractionDigits:2});
+  return `<div class="ivm" onclick="event.stopPropagation()"><button class="btn sm x" onclick="S.preview=null;render()">✕</button><div class="ivtop"><div class="ivlogo">CONSORTIA</div><div class="ivh"><h1>INVOICE</h1><div># ${i.number||'— (assigned on issue)'}</div></div></div>
+  <div class="ivmeta"><div><b>${en.name.toUpperCase()}</b>${en.lines.join('<br>')}<div class="ivbill"><span>Bill To:</span><b>${esc(e.companyName)}</b>${esc(e.address)}<br>Tax ID ${esc(e.taxId)}</div></div><div class="ivdates"><div><span>Date:</span><span>${i.issued||NOW}</span></div><div><span>Due Date:</span><span>${i.due||(i.seq===0?'+7 days':'+15 days')}</span></div><div class="bal"><span>Balance Due:</span><span>${i.status==='paid'?m(0):m(i.amount)}</span></div></div></div>
+  <table class="ivt"><tr><th>Item</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr><tr><td><b>${esc(i.desc)}</b></td><td>1</td><td>${m(i.amount)}</td><td>${m(i.amount)}</td></tr></table>
+  <div class="ivtot"><div><span>Subtotal:</span><span>${m(i.amount)}</span></div><div><span>Tax (0%):</span><span>${m(0)}</span></div><div><span>Total:</span><span>${m(i.amount)}</span></div></div>
+  <div class="ivnotes"><span>Notes:</span><br>Account number: ${bk.no}<br>Account name: ${bk.name}<br>Account type: Current (${i.currency})<br>IBAN: ${bk.iban}<br>SWIFT/BIC: ${bk.swift}<br>Bank: Bank of Cyprus Public Company Ltd${i.link?`<br><br><span>Payment Link - Please use this Link to perform the Payment :</span><br>${i.link}`:''}</div>
+  <div class="toolbar" style="margin-top:18px"><button class="btn primary" onclick="toast('PDF generated (invoice.mjs layout) and attached to the client record.','ok')">Download PDF</button><span class="hint">Production: invoice.mjs → Gotenberg → PDF, emailed to ${esc(e.email)}.</span></div></div>`;}
+
+/* ---- client portal for an engagement (before the project exists) ---- */
+function engPortal(e){
+  const depDone=e.deposit.status!=='pending',ndaReady=e.nda.status==='sent',ndaDone=e.nda.status==='signed',elReady=e.el.status==='sent',elDone=e.el.status==='signed';
+  const signBlock=kind=>`<div style="padding:12px 14px;border-top:1px solid var(--border-sub);display:flex;flex-direction:column;gap:10px"><label class="field">Type your full name to sign (${esc(e.contactName)})<input value="${esc(S.portalName||'')}" oninput="S.portalName=this.value" placeholder="${esc(e.contactName)}"></label><label style="display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--text-2)"><input type="checkbox" ${S.portalAgree?'checked':''} onchange="S.portalAgree=this.checked"><span>I have read this document and I am authorised to sign it on behalf of ${e.isIndividual?'myself':esc(e.companyName)}. I agree that typing my name here is my electronic signature.</span></label><div class="toolbar"><button class="btn primary" onclick="clientSign('${e.id}','${kind}')">Sign ${kind==='nda'?'NDA':'engagement letter'}</button><span class="hint">We record the date, time and IP address with your signature.</span></div></div>`;
+  const card=(t,h,body,cls)=>`<div class="pcard" style="${cls==='lock'?'opacity:.5':cls==='done'?'opacity:.75':''}"><div class="ph${cls===''?' attn':''}"><b>${t}</b><div class="spacer"></div><span class="sub11">${h}</span></div>${body||''}</div>`;
+  const steps=['Deposit','NDA','Financials','Engagement letter','Invoices'];const cur=!depDone?0:!ndaDone?1:!ESTEPS[2].done(e)?2:!elDone?3:4;
+  return `<div class="portal"><div class="pbar"><span class="wm">CONSORTIA</span><div class="spacer"></div><span style="font-size:12px;opacity:.85">${esc(e.companyName)} · ${esc(e.contactName)}</span></div><div class="pbody">
+    <div><div style="font:600 16px Newsreader,serif">Welcome back, ${esc(e.contactName.split(' ')[0])}.</div><div class="sub11">Business valuation · ${e.code}</div></div>
+    <div class="stepper" style="gap:6px">${steps.map((s,i)=>`<div class="step ${i<cur?'done':i===cur?'cur':''}" style="cursor:default"><div class="bar"></div><div class="lb">${s}${i<cur?' ✓':i===cur?' ●':''}</div></div>`).join('')}</div>
+    ${card('1. Reserve your review — €500 deposit',depDone?'paid '+(e.deposit.paid_at||'')+(e.deposit.status==='credited'?' · credited to Invoice 1':e.deposit.status==='refunded'?' · refunded':''):'refundable in full if you decide not to continue',depDone?'':`<div class="pr"><span style="flex:1">Refundable in full if you decide not to continue after your review.</span><button class="stripe" onclick="payDeposit('${e.id}')">Pay €500 with Stripe</button></div>`,depDone?'done':'')}
+    ${card('2. Sign the non-disclosure agreement',ndaDone?'signed '+e.nda.signed_at:ndaReady?'ready to sign':depDone?'being prepared':'after the deposit',ndaReady?signBlock('nda'):ndaDone?`<div class="pr"><span style="flex:1">Mutual NDA</span><span class="success">signed ✓ · <a href="#" onclick="return false">Download</a></span></div>`:'',ndaDone?'done':ndaReady?'':'lock')}
+    ${card('3. Upload your financials',ndaDone?`${e.docs.filter(d=>d.up).length} of ${e.docs.length} received`:'unlocks once the NDA is signed',ndaDone?e.docs.map((d,i)=>`<div class="pr"><span style="flex:1">${esc(d.l)}${d.req===false?' <span class="m">(optional)</span>':''}</span>${d.up?'<span class="success">received ✓</span>':`<button class="btn sm primary" onclick="engUpload('${e.id}',${i})">Upload</button>`}</div>`).join(''):'',ESTEPS[2].done(e)?'done':ndaDone?'':'lock')}
+    ${card('4. Sign your engagement letter',elDone?'signed '+e.el.signed_at:elReady?'read the full letter, then sign at the bottom':'sent after your review call',elReady?`<div style="padding:12px 14px;border-top:1px solid var(--border-sub)"><div class="doc small">${letterPreview(e.el.data,approachLines(e.el.data.approaches)).replace('<div class="doc">','').slice(0,-6)}</div></div>`+signBlock('el'):elDone?`<div class="pr"><span style="flex:1">Engagement letter — countersigned</span><span class="success">signed ✓ · <a href="#" onclick="return false">Download</a></span></div>`:'',elDone?'done':elReady?'':'lock')}
+    ${card('5. Invoices',elDone?'':'after signing',elDone?[e.depositInvoice,...e.invoices].filter(Boolean).map(i=>`<div class="pr"><span style="flex:1">${i.seq===0?'Deposit':'Invoice '+i.seq} — ${i.trigger}<div class="m">from ${ENTITY_DETAIL[i.entity].name}${i.number?' · #'+i.number:''} · no VAT</div></span><span class="chip ${i.status==='paid'||i.status==='credited'?'accent':i.status==='issued'?'attn':''}">${i.status}</span><span style="width:70px;text-align:right">${money(i.amount,i.currency)}</span></div>`).join(''):'',elDone?'':'lock')}
+  </div></div>`;
+}
+
+/* ---- project created when the valuation starts (replaces lead → project) ---- */
+function winEngagement(e){
+  const code='PRJ-0'+(DB.nextProject++);
+  let c=e.client?client(e.client):null;
+  if(!c){c={id:'CLI-0'+(95+DB.clients.length),name:e.companyName,short:e.companyName.replace(/ (Ltd|LLP|GmbH|doo|d\.o\.o\.)$/,''),reg:e.taxId,country:e.country,industry:'—',currency:'EUR',entity:'CY',owner:'KM',source:'GHL',lifecycle:'active',interest:'Valuation',contacts:[{n:e.contactName,r:e.contactTitle,primary:true,portal:true}],timeline:[]};DB.clients.push(c);e.client=c.id;}
+  const fee=e.el.data.fee||e.fee;
+  const p={code,client:c.id,clientName:c.short,title:'Business Valuation — '+c.short,service:'valuation',stage:1,owner:'KM',reviewer:'AP',fee,due:'TBC',entity:'CY',status:'active',risk:'ok',time:0,wip:0,version:'v0.1',thread:[],comments:[],engagement:e.id,start:'Today',
+    data:[{label:'Latest management accounts (top-up)',required:true,status:'requested',reminders:0},{label:'Clarifications on debt schedule',required:false,status:'requested',reminders:0}],
+    sections:SECTIONS.valuation.map(title=>({title,state:'todo'})),
+    tasks:[{t:'Normalise financial statements',a:'MA',est:4,st:'todo'},{t:'Build DCF model',a:'KM',est:8,st:'todo'},{t:'Comparable set & multiples',a:'AP',est:4,st:'todo'},{t:'Draft report',a:'KM',est:10,st:'todo'},{t:'Partner review',a:'AP',est:3,st:'todo'},{t:'Client walkthrough call',a:'KM',est:1,st:'todo'}]};
+  DB.projects.unshift(p);
+  const ent=defaultEntity(e.country);
+  [e.depositInvoice,...e.invoices].filter(Boolean).forEach(i=>DB.invoices.push({num:(i.entity==='UK'?'LLP ':'CY ')+'#'+(i.number||'—'),project:code,client:c.short,entity:i.entity,type:i.seq===0?'deposit':'inv'+i.seq,amount:i.amount,vat:0,currency:i.currency,status:i.status==='paid'?'paid':i.status==='issued'?'sent':'draft',issued:i.issued||'—',due:i.due||'—',paid:i.status==='paid'?'✓':null,eng:e.id,seq:i.seq}));
+  c.timeline.unshift({t:`<b>${code} created</b> — valuation started from ${e.code}`,m:'Just now · automated',auto:true});
+  const l=e.lead&&DB.leads.find(x=>x.id===e.lead);if(l){l.stage='won';l.project=code;l.client=c.id;}
+  return code;
+}
+
+/* ============ SAMPLE DATA ============ */
+const STAGES = ['Data top-up','Draft','Internal review','Client review','Final report','Closed'];
+const STAGES_SHORT = ['Data top-up','Draft','Review','Client review','Final','Closed'];
+const SERVICE = {valuation:'Valuation',business_plan:'Business plan',feasibility:'Feasibility',advisory:'Advisory',fractional_cfo:'Fractional CFO'};
+const USERS = {KM:{name:'Kyriacos M.',first:'Kyriacos',role:'Partner',cap:40},MA:{name:'Maria A.',first:'Maria',role:'Analyst',cap:40},AP:{name:'Andreas P.',first:'Andreas',role:'Reviewer',cap:40},EK:{name:'Elena K.',first:'Elena',role:'Manager',cap:40}};
+const ENTITY = {CY:'Consortia Ltd (CY)',UK:'Consortia Advisory LLP (UK)'};
+
+const CHECKLIST = {
+  valuation:['Audited FS 2022–24','Management accounts','Forecast model (3 years)','Cap table','Shareholder agreements'],
+  business_plan:['Historic FS (3 years)','Management accounts','Budget / forecast','Org chart & headcount','Product & price list'],
+  feasibility:['Site / asset details','Capex quotes','Historic FS','Market data & licences','Permits & approvals'],
+};
+const SECTIONS = {
+  valuation:['Scope & basis','Company overview','Market','Financial analysis','Valuation','Appendix'],
+  business_plan:['Executive summary','Business model','Market','Operations','Financial projections','Funding & appendix'],
+  feasibility:['Scope','Site & concept','Market demand','Technical & capex','Financial feasibility','Risks & appendix'],
+};
+
+let DB, DB_INVNO;
+function seed(){
+  const P = (o)=>{
+    const svc = o.service;
+    const p = Object.assign({status:'active',risk:'ok',reviewer:'AP',overdue:false,tasks:[],comments:[],data:[],time:0,wip:0,thread:[],version:'v0.1'},o);
+    // checklist from template
+    if(!o.data) p.data = CHECKLIST[svc].slice(0,4).map((label,i)=>({label,required:true,status:p.stage>=2?'received':(i<2&&p.stage>=1?'received':'requested'),reminders:0}));
+    if(!o.sections) p.sections = SECTIONS[svc].map((title,i)=>({title,state:p.stage>=4?'final':p.stage>=3?(i<5?'reviewed':'drafted'):p.stage===2?(i<2?'drafted':i===2?'drafting':'todo'):'todo'}));
+    if(!p.tasks.length){
+      p.tasks = [
+        {t:'Kick-off & scoping note',a:p.owner,est:1,st:'done'},
+        {t:'Data top-up from client',a:'MA',est:2,st:p.stage>=2?'done':'in_progress'},
+        {t:'Financial analysis',a:'MA',est:8,st:p.stage>=3?'done':p.stage===2?'in_progress':'todo'},
+        {t:'Draft report',a:p.owner,est:10,st:p.stage>=3?'done':'todo'},
+        {t:'Internal review',a:p.reviewer,est:3,st:p.stage>=4?'done':p.stage===3?'review':'todo'},
+      ];
+    }
+    return p;
+  };
+  const projects = [
+    P({code:'PRJ-0141',client:'CLI-0088',clientName:'Yelsa Connect',title:'Business Valuation FY25',service:'valuation',stage:2,owner:'KM',reviewer:'AP',fee:25000,due:'12 Sep',entity:'CY',time:41,wip:3900,version:'v0.4 draft',start:'20 Jul',
+      data:[{label:'Audited FS 2022–24',required:true,status:'received',reminders:0},{label:'Management accounts',required:true,status:'received',reminders:0},{label:'Forecast model (3 years)',required:true,status:'requested',reminders:2},{label:'Cap table',required:true,status:'requested',reminders:0}],
+      sections:[{title:'Scope & basis',state:'reviewed'},{title:'Company overview',state:'reviewed'},{title:'Market',state:'drafting'},{title:'Financial analysis',state:'todo'},{title:'Valuation',state:'todo'},{title:'Appendix',state:'todo'}],
+      tasks:[
+        {t:'Build comparables set',a:'AP',est:3,st:'todo'},{t:'Normalise EBITDA FY22–24',a:'MA',est:5,st:'todo'},{t:'Chase forecast model (3 years)',a:'MA',est:.5,st:'todo',src:'auto'},{t:'Chase cap table',a:'MA',est:.5,st:'todo',src:'auto'},{t:'Draft §5 Valuation',a:'KM',est:6,st:'todo'},{t:'Draft §6 Appendix',a:'MA',est:2,st:'todo'},
+        {t:'DCF model — WACC',a:'KM',est:4,log:2.5,st:'in_progress',active:true},{t:'Draft §3 Market',a:'MA',est:4,st:'in_progress',ai:true},
+        {t:'§2 Company overview',a:'AP',est:2,st:'review',comments:3},
+        {t:'Send NDA',a:'KM',st:'done'},{t:'Countersign NDA',a:'KM',st:'done'},{t:'Issue engagement letter',a:'KM',st:'done'},{t:'Issue deposit invoice',a:'EK',st:'done'},{t:'Record deposit',a:'EK',st:'done'},{t:'Request client data pack',a:'MA',st:'done'},{t:'Kick-off call',a:'KM',st:'done'},{t:'Draft §1 Scope',a:'MA',st:'done'},{t:'Draft §2 Company',a:'MA',st:'done'},
+      ],
+      comments:[{s:1,by:'AP',body:'§2 — headcount figures don\u2019t match the management accounts. Reconcile before we move on.',resolved:false},{s:1,by:'AP',body:'§2 — add the 2025 shareholder change (see cap table once received).',resolved:false},{s:1,by:'AP',body:'§2 — shorten the history paragraph; two lines is enough.',resolved:false},{s:0,by:'AP',body:'§1 — basis of value wording is fine now.',resolved:true}],
+      thread:[{who:'Paul M.',client:true,body:'Uploaded the management accounts — let me know if you need the monthly split.',at:'Today 09:41'},{who:'Maria A.',client:false,body:'Thanks Paul. Still waiting on the 3-year forecast model and the cap table — those two are holding the draft.',at:'Today 10:05'},{who:'Kyriacos M.',client:false,internal:true,body:'Internal: if the forecast isn\u2019t in by Friday we do a management-case ourselves and flag it in §5.',at:'Today 10:12'}]
+    }),
+    P({code:'PRJ-0142',client:'CLI-0091',clientName:'Garua Ltd',title:'Feasibility — Cold-chain hub',service:'feasibility',stage:1,owner:'MA',reviewer:'KM',fee:19000,due:'29 Sep',entity:'CY',time:9,wip:850,start:'11 Aug',
+      data:[{label:'Site / asset details',required:true,status:'received',reminders:0},{label:'Capex quotes',required:true,status:'requested',reminders:1},{label:'Historic FS',required:true,status:'received',reminders:0},{label:'2024 audited FS',required:true,status:'requested',reminders:0},{label:'Market data & licences',required:false,status:'requested',reminders:0}]}),
+    P({code:'PRJ-0138',client:'CLI-0079',clientName:'EvPlus Consulting',title:'Business plan — Series A',service:'business_plan',stage:1,owner:'AP',reviewer:'KM',fee:14000,due:'overdue',overdue:true,entity:'CY',risk:'at_risk',time:31,wip:2950,start:'2 Jul',
+      data:[{label:'Historic FS (3 years)',required:true,status:'received',reminders:0},{label:'Management accounts',required:true,status:'received',reminders:1},{label:'Budget / forecast',required:true,status:'received',reminders:0},{label:'Org chart & headcount',required:true,status:'requested',reminders:3}]}),
+    P({code:'PRJ-0135',client:'CLI-0064',clientName:'Two Pillar Cyprus',title:'Business Valuation FY25',service:'valuation',stage:4,owner:'KM',reviewer:'AP',fee:30000,due:'4 Sep',entity:'CY',time:88,wip:9200,version:'v1.0 client review',start:'2 Jun',
+      comments:[{s:4,by:'AP',body:'§5 — terminal growth 2.5% is at the top of the range; justify or trim.',resolved:true},{s:3,by:'AP',body:'§4 — normalise the FY23 one-off legal cost.',resolved:true}]}),
+    P({code:'PRJ-0136',client:'CLI-0086',clientName:'Halcyon Marine',title:'Business plan — Fleet expansion',service:'business_plan',stage:2,owner:'MA',reviewer:'KM',fee:16000,due:'20 Sep',entity:'UK',risk:'watch',time:27,wip:2500,version:'v0.2 draft',start:'28 Jul'}),
+    P({code:'PRJ-0133',client:'CLI-0075',clientName:'Lumen Retail',title:'Business plan — Store roll-out',service:'business_plan',stage:1,owner:'AP',reviewer:'KM',fee:4000,due:'25 Sep',entity:'UK',risk:'at_risk',time:6,wip:560,start:'5 Aug'}),
+    P({code:'PRJ-0140',client:'CLI-0090',clientName:'Kestrel Logistics',title:'Feasibility — Cross-dock facility',service:'feasibility',stage:1,owner:'AP',reviewer:'KM',fee:21000,due:'10 Oct',entity:'UK',time:12,wip:1100,start:'8 Aug'}),
+    P({code:'PRJ-0137',client:'CLI-0081',clientName:'Meridian Pharma',title:'Business Valuation — Shareholder exit',service:'valuation',stage:3,owner:'KM',reviewer:'AP',fee:28000,due:'9 Sep',entity:'UK',time:64,wip:6400,version:'v0.8 review',start:'15 Jun',
+      comments:[{s:4,by:'AP',body:'§5 — DLOM 20% needs a citation.',resolved:false},{s:2,by:'AP',body:'§3 — market size source is 2022; update.',resolved:false}]}),
+    P({code:'PRJ-0134',client:'CLI-0077',clientName:'Orion Studios',title:'Business plan — Studio expansion',service:'business_plan',stage:3,owner:'MA',reviewer:'KM',fee:12000,due:'8 Sep',entity:'CY',time:29,wip:2600,version:'v0.9 review',start:'1 Jul',
+      comments:[{s:4,by:'KM',body:'§5 — sensitivity table missing the downside case.',resolved:false}]}),
+    P({code:'PRJ-0131',client:'CLI-0080',clientName:'Nereus Shipping',title:'Feasibility — Dry-dock JV',service:'feasibility',stage:1,owner:'MA',reviewer:'KM',fee:26000,due:'18 Oct',entity:'CY',time:8,wip:760,start:'18 Aug'}),
+    P({code:'PRJ-0128',client:'CLI-0070',clientName:'Argo Foods',title:'Feasibility — Export facility',service:'feasibility',stage:5,owner:'AP',reviewer:'KM',fee:18000,due:'5 Sep',entity:'CY',time:52,wip:0,version:'v1.0 final',start:'12 May'}),
+    P({code:'PRJ-0117',client:'CLI-0088',clientName:'Yelsa Connect',title:'Business Valuation FY24',service:'valuation',stage:5,status:'delivered',owner:'KM',reviewer:'AP',fee:21000,due:'delivered 3 Mar',entity:'CY',time:70,wip:0,version:'v1.0 final',start:'10 Jan'}),
+    P({code:'PRJ-0120',client:'CLI-0064',clientName:'Two Pillar Cyprus',title:'Business plan — Board pack',service:'business_plan',stage:5,status:'delivered',owner:'MA',reviewer:'KM',fee:11000,due:'delivered 22 Apr',entity:'CY',time:38,wip:0,version:'v1.0 final',start:'1 Mar'}),
+    P({code:'PRJ-0125',client:'CLI-0070',clientName:'Argo Foods',title:'Business Valuation FY24',service:'valuation',stage:5,status:'delivered',owner:'KM',reviewer:'AP',fee:23000,due:'delivered 30 Jun',entity:'CY',time:72,wip:0,version:'v1.0 final',start:'2 Apr'}),
+  ];
+
+  const clients = [
+    {id:'CLI-0088',name:'Yelsa Connect Ltd',short:'Yelsa Connect',reg:'HE 412 883',country:'Cyprus',industry:'Tech',currency:'EUR',entity:'CY',owner:'KM',source:'GHL (Google Ads)',lifecycle:'active',interest:'Valuation',
+      contacts:[{n:'Paul M.',r:'CEO',primary:true,portal:true},{n:'Elena V.',r:'Finance',billing:true}],
+      timeline:[{t:'<b>NDA sent</b> · e-sign pending',m:'Today 09:14 · Kyriacos · expansion feasibility',auto:false},{t:'<b>Scoping call</b> — 45 min',m:'27 Aug · notes attached',auto:false},{t:'<b>Deposit €12,500 received</b>',m:'Today 08:02 · PRJ-0141 · automated',auto:true},{t:'<b>Imported from GoHighLevel</b>',m:'21 Aug · form "Feasibility enquiry" · fields mapped',auto:true},{t:'<b>PRJ-0141 created</b> from won lead',m:'20 Jul · automated',auto:true}]},
+    {id:'CLI-0091',name:'Garua Ltd',short:'Garua Ltd',reg:'HE 398 120',country:'Cyprus',industry:'Logistics',currency:'EUR',entity:'CY',owner:'MA',source:'Referral',lifecycle:'active',interest:'Feasibility',contacts:[{n:'Paul M.',r:'Managing Director',primary:true,portal:true}],timeline:[{t:'<b>Paul M.</b> uploaded Management accounts',m:'Today · portal',auto:true},{t:'<b>PRJ-0142 created</b> from won lead',m:'11 Aug · automated',auto:true}]},
+    {id:'CLI-0079',name:'EvPlus Consulting Ltd',short:'EvPlus Consulting',reg:'HE 371 004',country:'Cyprus',industry:'Consulting',currency:'EUR',entity:'CY',owner:'AP',source:'GHL (LinkedIn)',lifecycle:'active',interest:'Business plan',contacts:[{n:'Nikos D.',r:'Founder',primary:true,portal:true}],timeline:[{t:'<b>Reminder sent</b> — deposit invoice LLP #4 overdue',m:'Yesterday · automated',auto:true},{t:'<b>PRJ-0138 created</b>',m:'2 Jul',auto:true}]},
+    {id:'CLI-0064',name:'Two Pillar Cyprus Ltd',short:'Two Pillar Cyprus',reg:'HE 301 556',country:'Cyprus',industry:'Real estate',currency:'EUR',entity:'CY',owner:'KM',source:'Referral',lifecycle:'active',interest:'Valuation',contacts:[{n:'Andreas L.',r:'CFO',primary:true,portal:true,billing:true}],timeline:[{t:'<b>Draft v1.0 sent</b> for client review',m:'30 Aug · Kyriacos',auto:false}]},
+    {id:'CLI-0083',name:'Aegis Foods Ltd',short:'Aegis Foods',reg:'HE 355 771',country:'Cyprus',industry:'Food manufacturing',currency:'EUR',entity:'CY',owner:'MA',source:'GHL (Google Ads)',lifecycle:'active',interest:'Feasibility',contacts:[{n:'Maria S.',r:'Owner',primary:true,portal:false}],timeline:[{t:'<b>Scope change requested</b> — add second site',m:'1 Sep · Maria A.',auto:false}]},
+    {id:'CLI-0086',name:'Halcyon Marine Ltd',short:'Halcyon Marine',reg:'12 884 771',country:'United Kingdom',industry:'Marine',currency:'GBP',entity:'UK',owner:'MA',source:'GHL (Website)',lifecycle:'active',interest:'Business plan',contacts:[{n:'James R.',r:'Director',primary:true,portal:true}],timeline:[]},
+    {id:'CLI-0075',name:'Lumen Retail Ltd',short:'Lumen Retail',reg:'11 209 330',country:'United Kingdom',industry:'Retail',currency:'GBP',entity:'UK',owner:'AP',source:'Direct',lifecycle:'active',interest:'Business plan',contacts:[{n:'Sarah T.',r:'Owner',primary:true,portal:true}],timeline:[]},
+    {id:'CLI-0090',name:'Kestrel Logistics Ltd',short:'Kestrel Logistics',reg:'13 004 918',country:'United Kingdom',industry:'Logistics',currency:'GBP',entity:'UK',owner:'AP',source:'GHL (Google Ads)',lifecycle:'active',interest:'Feasibility',contacts:[{n:'Tom H.',r:'COO',primary:true,portal:true}],timeline:[]},
+    {id:'CLI-0081',name:'Meridian Pharma Ltd',short:'Meridian Pharma',reg:'10 771 204',country:'United Kingdom',industry:'Pharma',currency:'GBP',entity:'UK',owner:'KM',source:'Referral',lifecycle:'active',interest:'Valuation',contacts:[{n:'Dr. Anna W.',r:'CEO',primary:true,portal:true}],timeline:[]},
+    {id:'CLI-0077',name:'Orion Studios Ltd',short:'Orion Studios',reg:'HE 388 010',country:'Cyprus',industry:'Media',currency:'EUR',entity:'CY',owner:'MA',source:'GHL (LinkedIn)',lifecycle:'active',interest:'Business plan',contacts:[{n:'Giorgos P.',r:'Founder',primary:true,portal:true}],timeline:[]},
+    {id:'CLI-0092',name:'Delphi Analytics Ltd',short:'Delphi Analytics',reg:'HE 420 118',country:'Cyprus',industry:'Tech',currency:'EUR',entity:'CY',owner:'KM',source:'GHL (Google Ads)',lifecycle:'active',interest:'Valuation',contacts:[{n:'Christos A.',r:'CEO',primary:true,portal:true}],timeline:[]},
+    {id:'CLI-0080',name:'Nereus Shipping Ltd',short:'Nereus Shipping',reg:'HE 340 902',country:'Cyprus',industry:'Shipping',currency:'EUR',entity:'CY',owner:'MA',source:'Referral',lifecycle:'active',interest:'Feasibility',contacts:[{n:'Michalis K.',r:'CFO',primary:true,portal:true}],timeline:[]},
+    {id:'CLI-0093',name:'Sable Capital LLP',short:'Sable Capital',reg:'OC 441 209',country:'United Kingdom',industry:'Private equity',currency:'GBP',entity:'UK',owner:'KM',source:'Referral',lifecycle:'active',interest:'Valuation',contacts:[{n:'Olivia B.',r:'Partner',primary:true,portal:false}],timeline:[]},
+    {id:'CLI-0070',name:'Argo Foods Ltd',short:'Argo Foods',reg:'HE 322 480',country:'Cyprus',industry:'Food',currency:'EUR',entity:'CY',owner:'AP',source:'Referral',lifecycle:'active',interest:'Feasibility',contacts:[{n:'Eleni M.',r:'CEO',primary:true,portal:true}],timeline:[]},
+    {id:'CLI-0094',name:'White Panda Ltd',short:'White Panda',reg:'HE 425 001',country:'Cyprus',industry:'E-commerce',currency:'EUR',entity:'CY',owner:'KM',source:'GHL (Google Ads)',lifecycle:'lead',interest:'Valuation',contacts:[{n:'Lena F.',r:'Founder',primary:true,portal:false}],timeline:[{t:'<b>Engagement letter sent</b> · awaiting e-sign',m:'29 Aug · Kyriacos',auto:false},{t:'<b>Proposal accepted</b> — €30k',m:'26 Aug',auto:false},{t:'<b>Imported from GoHighLevel</b>',m:'12 Aug · form "Valuation enquiry"',auto:true}]},
+  ];
+
+  const leads = [
+    // NEW (GHL) — 9
+    {id:'L1',company:'Northwind Ltd',service:'valuation',fee:0,stage:'new',src:'GHL form',p:10},
+    {id:'L2',company:'Cobalt Fintech',service:'business_plan',fee:0,stage:'new',src:'GHL call',p:10},
+    {id:'L3',company:'Atlas Hospitality',service:'feasibility',fee:0,stage:'new',src:'GHL form',p:10},
+    {id:'L4',company:'Verde Agro',service:'valuation',fee:0,stage:'new',src:'GHL form',p:10},
+    {id:'L5',company:'Pelion Energy',service:'feasibility',fee:0,stage:'new',src:'GHL call',p:10},
+    {id:'L6',company:'Kalliste Wines',service:'business_plan',fee:0,stage:'new',src:'GHL form',p:10},
+    {id:'L7',company:'Ionian Yachts',service:'valuation',fee:0,stage:'new',src:'GHL form',p:10},
+    {id:'L8',company:'Brightwave Media',service:'business_plan',fee:0,stage:'new',src:'GHL form',p:10},
+    {id:'L9',company:'Tectonic Build',service:'feasibility',fee:0,stage:'new',src:'GHL form',p:10},
+    // QUALIFYING — 4
+    {id:'L10',company:'Thalassa Foods',service:'valuation',fee:18000,stage:'call1',src:'Referral',p:25,close:'Oct'},
+    {id:'L11',company:'Cyclades Hotels',service:'feasibility',fee:22000,stage:'call1',src:'Google Ads',p:25,close:'Oct'},
+    {id:'L12',company:'Nova Dental',service:'business_plan',fee:9000,stage:'call1',src:'LinkedIn',p:25,close:'Nov'},
+    {id:'L13',company:'Helios Solar',service:'valuation',fee:27000,stage:'call1',src:'Website',p:25,close:'Nov'},
+    // PROPOSAL / NDA — 3
+    {id:'L14',company:'Yelsa Connect',client:'CLI-0088',service:'feasibility',fee:15000,stage:'engaged',src:'Google Ads',p:50,close:'Sep',tag:'NDA sent'},
+    {id:'L15',company:'Marmara Textiles',service:'business_plan',fee:13000,stage:'engaged',src:'Referral',p:50,close:'Sep'},
+    {id:'L16',company:'Zephyr Aviation',service:'valuation',fee:32000,stage:'engaged',src:'LinkedIn',p:50,close:'Oct'},
+    // ENG. LETTER OUT — 2
+    {id:'L17',company:'White Panda',client:'CLI-0094',service:'valuation',fee:30000,stage:'proposal',src:'Google Ads',p:80,close:'Sep',tag:'awaiting e-sign'},
+    {id:'L18',company:'Corinth Marble',service:'feasibility',fee:17000,stage:'proposal',src:'Referral',p:80,close:'Sep',tag:'awaiting e-sign'},
+    // WON — 5
+    {id:'L19',company:'Garua Ltd',client:'CLI-0091',service:'feasibility',fee:19000,stage:'won',src:'Referral',p:100,project:'PRJ-0142'},
+    {id:'L20',company:'Kestrel Logistics',client:'CLI-0090',service:'feasibility',fee:21000,stage:'won',src:'Google Ads',p:100,project:'PRJ-0140'},
+    {id:'L21',company:'Sable Capital',client:'CLI-0093',service:'valuation',fee:20000,stage:'won',src:'Referral',p:100,project:'PRJ-0129'},
+    {id:'L22',company:'Delphi Analytics',client:'CLI-0092',service:'valuation',fee:24000,stage:'won',src:'Google Ads',p:100,project:'PRJ-0132'},
+    {id:'L23',company:'Aegis Foods',client:'CLI-0083',service:'feasibility',fee:22000,stage:'won',src:'Google Ads',p:100,project:'PRJ-0130'},
+    // LOST / NURTURE — 11
+    ...['Poseidon Ferries','Alpha Dental','Crete Olive Co','Lyra Software','Mosaic Interiors','Delta Print','Aurora Spa','Titan Steel','Kyma Fisheries','Nemo Diving','Sirius Labs'].map((c,i)=>({id:'LX'+i,company:c,service:['valuation','business_plan','feasibility'][i%3],fee:[8,12,15,20,6,9,11,25,7,5,14][i]*1000,stage:'lost',src:['Google Ads','Website','Referral','LinkedIn'][i%4],p:0,reason:['no budget','went in-house','timing — nurture','chose competitor'][i%4]})),
+  ];
+
+  // invoices: two per project
+  const invoices = [];
+  const invNo={CY:5,UK:0};
+  const mk=(p,type,amount,st,extra)=>{const c=clients.find(x=>x.id===p.client);const ent=defaultEntity(c?c.country:'Cyprus');const num=(ent==='UK'?'LLP #':'CY #')+(st==='draft'?'—':++invNo[ent]);invoices.push(Object.assign({num,project:p.code,client:p.clientName,entity:ent,type,amount,vat:0,currency:'EUR',status:st,issued:'—',due:'—',paid:null},extra||{}));};
+  for(const p of projects){
+    const sc=schedule(p.fee);
+    mk(p,'deposit',500,p.status==='delivered'?'paid':'paid',{issued:p.start,due:'+7d',paid:'✓'});
+    mk(p,'inv1',sc.inv1,'paid',{issued:p.start,due:'+15d',paid:'✓'});
+    if(p.status==='delivered'){mk(p,'inv2',sc.inv2,'paid',{issued:p.due.replace('delivered ',''),due:'+15d',paid:'✓'});continue;}
+    if(p.code==='PRJ-0128'){mk(p,'inv2',sc.inv2,'overdue',{issued:'10 Aug',due:'25 Aug',daysOver:12});continue;}
+    if(p.stage>=5) mk(p,'inv2',sc.inv2,'sent',{issued:'1 Sep',due:'16 Sep'}); else mk(p,'inv2',sc.inv2,'draft');
+  }
+  DB_INVNO=invNo;
+  const y = invoices.find(i=>i.project==='PRJ-0141'&&i.type==='inv1'); y.issued='22 Jul'; y.due='6 Aug';
+
+  const documents = [
+    {name:'NDA — Yelsa Connect',kind:'nda',project:'PRJ-0141',client:'Yelsa Connect',v:1,by:'Kyriacos M.',vis:'client',date:'22 Jul',sig:'signed'},
+    {name:'Engagement letter — Valuation FY25',kind:'eng_letter',project:'PRJ-0141',client:'Yelsa Connect',v:2,by:'Kyriacos M.',vis:'client',date:'24 Jul',sig:'signed',supersedes:'v1 (typo in fee schedule)'},
+    {name:'Audited FS 2022–2024.pdf',kind:'fs',project:'PRJ-0141',client:'Yelsa Connect',v:1,by:'Paul M. (portal)',vis:'client',date:'29 Jul'},
+    {name:'Management accounts Jan–Jul 2026.xlsx',kind:'mgmt_accounts',project:'PRJ-0141',client:'Yelsa Connect',v:1,by:'Paul M. (portal)',vis:'client',date:'Today'},
+    {name:'Valuation report FY25',kind:'deliverable',project:'PRJ-0141',client:'Yelsa Connect',v:4,by:'Maria A.',vis:'internal',date:'Yesterday',supersedes:'v0.3 · v0.2 · v0.1'},
+    {name:'DCF model FY25.xlsx',kind:'other',project:'PRJ-0141',client:'Yelsa Connect',v:7,by:'Kyriacos M.',vis:'internal',date:'Today',supersedes:'6 earlier versions'},
+    {name:'NDA — Two Pillar Cyprus',kind:'nda',project:'PRJ-0135',client:'Two Pillar Cyprus',v:1,by:'Kyriacos M.',vis:'client',date:'3 Jun',sig:'signed'},
+    {name:'Valuation report FY25 — v1.0',kind:'deliverable',project:'PRJ-0135',client:'Two Pillar Cyprus',v:10,by:'Kyriacos M.',vis:'client',date:'30 Aug',sig:'sent'},
+    {name:'Feasibility report — final',kind:'deliverable',project:'PRJ-0128',client:'Argo Foods',v:10,by:'Andreas P.',vis:'client',date:'1 Sep',sig:'viewed'},
+    {name:'Engagement letter — White Panda',kind:'eng_letter',project:'—',client:'White Panda',v:1,by:'Kyriacos M.',vis:'client',date:'29 Aug',sig:'sent'},
+    {name:'Engagement letter — Series A plan',kind:'eng_letter',project:'PRJ-0138',client:'EvPlus Consulting',v:1,by:'Andreas P.',vis:'client',date:'8 Jul',sig:'signed'},
+    {name:'Capex quotes — pack 1.pdf',kind:'other',project:'PRJ-0142',client:'Garua Ltd',v:1,by:'Maria A.',vis:'internal',date:'28 Aug'},
+    {name:'Management accounts H1.pdf',kind:'mgmt_accounts',project:'PRJ-0142',client:'Garua Ltd',v:1,by:'Paul M. (portal)',vis:'client',date:'14 min ago'},
+  ];
+
+  const activity = [
+    {dot:'accent',html:'<b>Paul M.</b> uploaded <b>Management accounts</b>',meta:'Garua Ltd · 14 min ago',go:'#/project/PRJ-0142'},
+    {dot:'success',html:'Deposit <b>€12,500</b> received',meta:'Yelsa Connect · 2 hours ago',go:'#/invoices'},
+    {dot:'brand',html:'<b>9 new leads</b> imported from GoHighLevel',meta:'Automated · this morning',go:'#/leads'},
+    {dot:'inactive',html:'Maria advanced <b>PRJ-0141</b> to Draft',meta:'Yesterday 17:40',go:'#/project/PRJ-0141'},
+  ];
+
+  const myTasks = {
+    KM:[
+      {t:'Review DCF assumptions',p:'Yelsa Connect',stage:'Draft',due:'Today',urgent:true,go:'#/project/PRJ-0141'},
+      {t:'Chase 2024 audited FS',p:'Garua Ltd',stage:'Data exchange',due:'Tomorrow',go:'#/project/PRJ-0142'},
+      {t:'Draft market analysis §3',p:'EvPlus Consulting',stage:'Draft',due:'4 Sep',go:'#/project/PRJ-0138'},
+      {t:'Countersign engagement letter',p:'White Panda',stage:'Eng. letter',due:'5 Sep',go:'#/client/CLI-0094'},
+      {t:'Resolve 3 review comments',p:'Two Pillar Cyprus',stage:'Review',due:'6 Sep',go:'#/project/PRJ-0135'},
+      {t:'Approve Argo final invoice',p:'Argo Foods',stage:'Final sig.',due:'6 Sep',go:'#/project/PRJ-0128'},
+    ],
+    MA:[
+      {t:'Draft §3 Market',p:'Yelsa Connect',stage:'Draft',due:'Today',urgent:true,go:'#/project/PRJ-0141'},
+      {t:'Chase forecast model',p:'Yelsa Connect',stage:'Draft',due:'Today',urgent:true,go:'#/project/PRJ-0141'},
+      {t:'Normalise EBITDA FY22–24',p:'Yelsa Connect',stage:'Draft',due:'4 Sep',go:'#/project/PRJ-0141'},
+      {t:'Capex quotes follow-up',p:'Garua Ltd',stage:'Data exchange',due:'5 Sep',go:'#/project/PRJ-0142'},
+      {t:'Draft §4 Operations',p:'Halcyon Marine',stage:'Draft',due:'8 Sep',go:'#/project/PRJ-0136'},
+    ]
+  };
+
+  const time = {
+    rows:[
+      {label:'PRJ-0141 · DCF model',go:'#/project/PRJ-0141',h:[2,3.5,1,null,null],billable:true},
+      {label:'PRJ-0135 · Review',go:'#/project/PRJ-0135',h:[null,1.5,2,2,null],billable:true},
+      {label:'PRJ-0137 · §5 Valuation',go:'#/project/PRJ-0137',h:[null,null,null,2.5,null],billable:true},
+      {label:'Non-billable · BD calls',h:[1,null,1.5,null,2],billable:false},
+    ],
+    util:[{u:'KM',pct:78},{u:'MA',pct:92},{u:'AP',pct:54},{u:'EK',pct:41}],
+    recovery:[{p:'PRJ-0141',pct:62},{p:'PRJ-0138',pct:104},{p:'PRJ-0135',pct:87},{p:'PRJ-0137',pct:71},{p:'PRJ-0136',pct:96}],
+  };
+
+  const notifications = [
+    {t:'<b>Deposit unpaid</b> — LLP #4 EvPlus is 9 days overdue',m:'Automated · yesterday',go:'#/invoices'},
+    {t:'<b>Paul M.</b> uploaded Management accounts',m:'Garua Ltd · 14 min ago',go:'#/project/PRJ-0142'},
+    {t:'<b>Andreas</b> left 3 comments on §2',m:'PRJ-0141 · yesterday',go:'#/project/PRJ-0141?tab=comments'},
+    {t:'<b>GoHighLevel</b> — 9 new leads need triage',m:'This morning',go:'#/leads?view=triage'},
+  ];
+
+  return {projects,clients,leads,invoices,documents,activity,myTasks,time,notifications,nextProject:143,nextEng:143,invNo:DB_INVNO,ghlSynced:'4 min ago'};
+}
+</script>
+<script>
+/* ============ STATE, HELPERS, ROUTING ============ */
+DB = seed(); seedEngagements();
+const S = {preview:null,engSel:null,engId:null,portalEng:null,portalName:'',portalAgree:false,entity:'CY',role:'KM',spec:false,menu:null,search:'',portalProject:'PRJ-0141',lostOpen:false,doneOpen:{},leadView:'pipeline',timerOn:false,triageSel:null,docOpen:null,noteInternal:false};
+const $ = id=>document.getElementById(id);
+const esc = s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const money = (n,cur='EUR')=>{const sym=cur==='GBP'?'£':'€';return sym+Math.round(n).toLocaleString('en-GB');};
+const k = (n,cur='EUR')=>{const sym=cur==='GBP'?'£':'€';return sym+(n/1000).toLocaleString('en-GB',{maximumFractionDigits:1})+'k';};
+const proj = code=>DB.projects.find(p=>p.code===code);
+const client = id=>DB.clients.find(c=>c.id===id);
+const active = ()=>DB.projects.filter(p=>p.status==='active');
+const depositInv = p=>DB.invoices.find(i=>i.project===p.code&&i.type==='inv1');
+const finalInv = p=>DB.invoices.find(i=>i.project===p.code&&i.type==='inv2');
+const unresolved = p=>p.comments.filter(c=>!c.resolved).length;
+const outstanding = p=>p.data.filter(d=>d.required&&d.status==='requested').length;
+const finalSigned = p=>!!DB.documents.find(d=>d.project===p.code&&d.kind==='deliverable'&&d.sig==='signed');
+
+/* gate rules — in the real product these run server-side */
+function gate(p){
+  if(p.status!=='active') return null;
+  const dep = depositInv(p);
+  if(dep && dep.status!=='paid') return {hard:true,reason:`Invoice 1 ${money(dep.amount,dep.currency)} unpaid${dep.daysOver?` — ${dep.daysOver} days overdue`:''} — work is on hold`};
+  if(p.stage===1 && outstanding(p)>0) return {hard:false,reason:`${outstanding(p)} required item${outstanding(p)>1?'s':''} outstanding — Draft cannot start`};
+  if(p.stage===2 && outstanding(p)>0) return {hard:false,reason:`${outstanding(p)} required document${outstanding(p)>1?'s':''} outstanding — Draft cannot be completed`};
+  if(p.stage===3 && unresolved(p)>0) return {hard:false,reason:`${unresolved(p)} unresolved review comment${unresolved(p)>1?'s':''} — Client review cannot start`};
+  if(p.stage===4 && unresolved(p)>0) return {hard:false,reason:`${unresolved(p)} unresolved client comment${unresolved(p)>1?'s':''} — Final report cannot be issued`};
+  if(p.stage===5){const f=finalInv(p);if(!f||f.status!=='paid')return {hard:false,reason:`Invoice 2 unpaid — cannot close`};}
+  return null;
+}
+const blocked = p=>{const g=gate(p);return !!(g&&g.hard);};
+
+function toast(msg,kind=''){const t=document.createElement('div');t.className='toast '+kind;t.innerHTML=msg;$('toasts').appendChild(t);setTimeout(()=>t.remove(),4200);}
+function log(dot,html,meta,go){DB.activity.unshift({dot,html,meta,go});}
+function go(h){S.menu=null;location.hash=h;}
+function parseRoute(){
+  const h = location.hash.replace(/^#\/?/,'')||'dashboard';
+  const [path,qs] = h.split('?');
+  const seg = path.split('/');
+  const q = {};(qs||'').split('&').forEach(kv=>{if(!kv)return;const [a,b]=kv.split('=');q[a]=decodeURIComponent(b||'');});
+  return {route:seg[0],id:seg[1],q};
+}
+window.addEventListener('hashchange',render);
+document.addEventListener('click',e=>{if(!e.target.closest('.rel')&&S.menu){S.menu=null;render();}});
+
+/* ============ SHELL ============ */
+function sidebar(r){
+  const on = x=>r.route===x?' active':'';
+  const u = USERS[S.role];
+  const ini = S.role;
+  const newLeads = DB.leads.filter(l=>l.stage==='new').length;
+  return `<div class="sidebar">
+    <div class="brand"><div class="wm">CONSORTIA</div><div class="sub">ADVISORY OS</div></div>
+    <div class="nav${on('dashboard')}" tabindex="0" onclick="go('#/dashboard')">Dashboard</div>
+    <div class="nav-h">CLIENTS</div>
+    <div class="nav${on('leads')}" tabindex="0" onclick="go('#/leads')">Leads<span class="count">${newLeads}</span></div>
+    <div class="nav${on('engagements')||on('engagement')}" tabindex="0" onclick="go('#/engagements')">Engagements<span class="count">${DB.engagements.filter(e=>['proposal','engaged'].includes(engStage(e))).length}</span></div>
+    <div class="nav${on('clients')||on('client')}" tabindex="0" onclick="go('#/clients')">Clients</div>
+    <div class="nav-h">DELIVERY</div>
+    <div class="nav${on('projects')||on('project')}" tabindex="0" onclick="go('#/projects')">Projects</div>
+    <div class="nav${on('docs')}" tabindex="0" onclick="go('#/docs')">Documents</div>
+    <div class="nav${on('time')}" tabindex="0" onclick="go('#/time')">Time</div>
+    <div class="nav-h">FINANCE</div>
+    <div class="nav${on('invoices')}" tabindex="0" onclick="go('#/invoices')">Invoices</div>
+    <div class="nav${on('reports')}" tabindex="0" onclick="go('#/reports')">Reports</div>
+    <div class="sb-bottom">
+      <div class="nav${on('portal')}" tabindex="0" onclick="go('#/portal')">Client portal ↗</div>
+      <div class="user" onclick="toggleRole()" title="Prototype: click to switch between Partner and Analyst view">
+        <div class="av">${ini}</div>
+        <div style="display:flex;flex-direction:column"><span class="nm">${u.name}</span><span class="rl">${u.role} · <u>switch role</u></span></div>
+      </div>
+    </div>
+  </div>`;
+}
+function pageTitle(r){
+  if(r.route==='engagements')return 'Engagements';if(r.route==='engagement'){const e=eng(r.id);return e?`Engagement · ${e.code}`:'Engagement';}
+  switch(r.route){
+    case 'dashboard':return 'Dashboard';case 'leads':return 'Leads';case 'clients':return 'Clients';
+    case 'client':{const c=client(r.id);return c?c.name:'Client';}
+    case 'projects':return 'Projects';
+    case 'project':{const p=proj(r.id);return p?`${p.code} · ${p.title}`:'Project';}
+    case 'docs':return 'Documents';case 'time':return 'Time';case 'invoices':return 'Invoices';case 'reports':return 'Reports';case 'portal':return 'Client portal preview';
+  }
+  return 'Dashboard';
+}
+function searchResults(){
+  const q = S.search.trim().toLowerCase(); if(q.length<2) return '';
+  const out=[];
+  DB.projects.filter(p=>(p.code+' '+p.clientName+' '+p.title).toLowerCase().includes(q)).slice(0,4).forEach(p=>out.push(`<div onclick="go('#/project/${p.code}')">${p.code} · ${esc(p.title)}<span class="k">project · ${esc(p.clientName)}</span></div>`));
+  DB.clients.filter(c=>c.name.toLowerCase().includes(q)).slice(0,3).forEach(c=>out.push(`<div onclick="go('#/client/${c.id}')">${esc(c.name)}<span class="k">client · ${c.id}</span></div>`));
+  DB.leads.filter(l=>l.company.toLowerCase().includes(q)&&!['won','lost'].includes(l.stage)).slice(0,3).forEach(l=>out.push(`<div onclick="go('#/leads')">${esc(l.company)}<span class="k">lead · ${l.stage.replace('_',' / ')}</span></div>`));
+  DB.invoices.filter(i=>i.num.toLowerCase().includes(q)).slice(0,2).forEach(i=>out.push(`<div onclick="go('#/invoices')">${i.num}<span class="k">invoice · ${esc(i.client)}</span></div>`));
+  if(!out.length) return `<div class="search-dd"><div class="ghost" style="cursor:default">Nothing matches “${esc(S.search)}”</div></div>`;
+  return `<div class="search-dd">${out.join('')}</div>`;
+}
+function topbar(r){
+  const entLabel = S.entity==='BOTH'?'Both entities':ENTITY[S.entity];
+  return `<div class="topbar">
+    <div class="title">${esc(pageTitle(r))}</div>
+    <div class="search rel"><span style="margin-right:6px">⌕</span><input id="q" value="${esc(S.search)}" placeholder="Search clients, projects…" oninput="S.search=this.value;render();document.getElementById('q').focus();document.getElementById('q').setSelectionRange(99,99)">${searchResults()}</div>
+    <div class="spacer"></div>
+    <div class="entity rel" onclick="event.stopPropagation();S.menu=S.menu==='entity'?null:'entity';render()">${entLabel} ▾
+      ${S.menu==='entity'?`<div class="menu" style="left:0;right:auto"><div class="mh">ACTIVE LEGAL ENTITY</div><div onclick="event.stopPropagation();setEntity('CY')">${ENTITY.CY}</div><div onclick="event.stopPropagation();setEntity('UK')">${ENTITY.UK}</div><div onclick="event.stopPropagation();setEntity('BOTH')">Both entities</div></div>`:''}
+    </div>
+    <div class="rel"><button class="btn" onclick="event.stopPropagation();S.menu=S.menu==='notif'?null:'notif';render()">Notifications</button>
+      ${S.menu==='notif'?`<div class="notif">${DB.notifications.map(n=>`<div class="n" onclick="go('${n.go}')">${n.t}<div class="m">${n.m}</div></div>`).join('')}</div>`:''}
+    </div>
+    <div class="rel"><button class="btn primary" onclick="event.stopPropagation();S.menu=S.menu==='new'?null:'new';render()">+ New</button>
+      ${S.menu==='new'?`<div class="menu"><div onclick="openCreate('lead')">Lead</div><div onclick="openCreate('client')">Client</div><div onclick="openCreate('project')">Project</div><div onclick="openCreate('invoice')">Invoice (ad hoc)</div><div onclick="openCreate('time')">Time entry</div></div>`:''}
+    </div>
+    <button class="specbtn${S.spec?' on':''}" onclick="S.spec=!S.spec;render()" title="Feature notes for this screen">✦ Spec notes</button>
+  </div>`;
+}
+function setEntity(e){S.entity=e;S.menu=null;render();toast(`Financial views now scoped to <b>${e==='BOTH'?'both entities':ENTITY[e]}</b>. Dashboard and delivery screens stay firm-wide.`);}
+function toggleRole(){S.role=S.role==='KM'?'MA':'KM';render();toast(S.role==='KM'?'Viewing as <b>Kyriacos (Partner)</b> — full firm view.':'Viewing as <b>Maria (Analyst)</b> — own tasks and utilisation only, no firm financials.');}
+
+function render(){
+  const r = parseRoute();
+  let body;
+  switch(r.route){
+    case 'dashboard':body=dashboard(r);break;case 'leads':body=leads(r);break;case 'engagements':body=engagementsList(r);break;case 'engagement':body=engagementDetail(r);break;case 'clients':body=clientsList(r);break;case 'client':body=clientRecord(r);break;
+    case 'projects':body=projectsList(r);break;case 'project':body=projectDetail(r);break;case 'docs':body=docsVault(r);break;case 'time':body=timeScreen(r);break;
+    case 'invoices':body=invoicesScreen(r);break;case 'reports':body=reportsScreen(r);break;case 'portal':body=portalScreen(r);break;default:body=dashboard(r);
+  }
+  $('app').innerHTML = sidebar(r)+`<div class="main">${topbar(r)}<div class="content">${body}</div></div>`;
+  $('drawer').className='drawer'+(S.spec?' open':'');
+  $('drawer').innerHTML = S.spec?specNotes(r):'';
+  if(S.preview){const e=eng(S.preview.id);const i=S.preview.seq===0?e.depositInvoice:e.invoices.find(x=>x.seq===S.preview.seq);$('overlay').className='overlay open';$('overlay').setAttribute('onclick','S.preview=null;render()');$('overlay').innerHTML=invoiceDoc(e,i);}else if($('overlay').getAttribute('onclick')){$('overlay').removeAttribute('onclick');$('overlay').className='overlay';$('overlay').innerHTML='';}
+}
+
+/* ============ DASHBOARD ============ */
+function dashboard(r){
+  const A = active();
+  const live=A.length, awaiting=A.filter(p=>p.stage===1).length, inRev=A.filter(p=>p.stage===3||p.stage===4).length, needMe=A.filter(p=>(p.stage===3&&p.reviewer===S.role)||(p.stage===4&&p.owner===S.role)).length;
+  const od = DB.invoices.filter(i=>i.status==='overdue');
+  const odSum = od.reduce((s,i)=>s+i.amount,0);
+  const newLeads = DB.leads.filter(l=>l.stage==='new').length;
+  const partner = S.role==='KM';
+  const kpis = partner?`<div class="kpis">
+    <div class="kpi" onclick="go('#/projects?filter=live')"><div class="l">Live projects</div><div class="v">${live}</div><div class="d success">+2 this month</div></div>
+    <div class="kpi" onclick="go('#/projects?stage=1')"><div class="l">Awaiting data top-up</div><div class="v">${awaiting}</div><div class="d muted">avg. 17 days</div></div>
+    <div class="kpi" onclick="go('#/projects?filter=review')"><div class="l">In review</div><div class="v">${inRev}</div><div class="d muted">${needMe} need you</div></div>
+    <div class="kpi${od.length?' attn':''}" onclick="go('#/invoices?status=overdue')"><div class="l">Overdue invoices</div><div class="v">${od.length}</div><div class="d ${od.length?'danger':'success'}">${od.length?money(odSum)+' overdue':'all settled'}</div></div>
+    <div class="kpi" onclick="go('#/leads?view=triage')"><div class="l">New leads (GHL)</div><div class="v">${newLeads}</div><div class="d accent">synced ${DB.ghlSynced}</div></div>
+  </div>`:'';
+  const tasks = DB.myTasks[S.role]||[];
+  const taskRows = tasks.map(t=>`<div class="trow click" style="grid-template-columns:1.5fr 1fr .8fr .6fr" tabindex="0" onclick="go('${t.go}')"><span>${esc(t.t)}</span><span class="muted">${esc(t.p)}</span><span class="muted">${t.stage}</span><span class="${t.urgent?'danger w500':'muted'}">${t.due}</span></div>`).join('');
+  const counts = STAGES.map((_,i)=>A.filter(p=>p.stage===i+1).length);
+  const mx = Math.max(...counts,1);
+  const bars = counts.map((c,i)=>{const h=Math.max(6,Math.round(c/mx*76));const isMax=c===mx;const col=isMax?'var(--brand)':(i===4?'var(--accent)':'var(--inactive)');return `<div onclick="go('#/projects?stage=${i+1}')" title="${c} project${c===1?'':'s'}"><div class="b" style="height:${h}px;background:${col}"></div><span class="l${isMax?' w600':''}" style="${isMax?'color:var(--text)':''}">${STAGES_SHORT[i]}</span></div>`;}).join('');
+  const utilRows = DB.time.util.filter(u=>partner||u.u===S.role).map(u=>`<div class="util"><span class="n">${USERS[u.u].first}</span><div class="tr"><div class="fl" style="width:${Math.min(u.pct,100)}%;${u.pct>=90?'background:var(--danger)':''}"></div></div><span class="p">${u.pct}%</span></div>`).join('');
+  const act = DB.activity.slice(0,5).map(a=>`<div class="act" style="cursor:pointer" onclick="go('${a.go}')"><div class="dot dot-${a.dot}"></div><div><div class="tx">${a.html}</div><div class="mt">${a.meta}</div></div></div>`).join('');
+  const decisions = partner?`<div class="decision"><div class="t">Needs a partner decision</div>
+    <div class="li" onclick="go('#/project/PRJ-0138')">EvPlus deposit 9 days overdue — pause work?</div>
+    <div class="li" onclick="go('#/project/PRJ-0130')">Aegis Foods scope creep — reprice feasibility</div>
+    <div class="li" onclick="go('#/time?view=team')">Maria at 92% — reassign Halcyon draft</div></div>`:'';
+  return `<div class="col">${kpis}
+    <div class="grid2">
+      <div class="col">
+        <div class="card rounded"><div class="card-h"><div class="t">My tasks — blocking delivery</div><div class="spacer"></div><span class="s">${tasks.length} open</span></div>
+          <div class="thead" style="grid-template-columns:1.5fr 1fr .8fr .6fr">Task<span>Project</span><span>Stage</span><span>Due</span></div>${taskRows}</div>
+        <div class="card pad" style="display:flex;flex-direction:column;gap:14px"><div style="display:flex;align-items:baseline;gap:10px"><div class="h14">Where projects are stuck</div><span class="sub11">count of live projects by stage · click a bar to filter</span></div><div class="bar-h">${bars}</div></div>
+      </div>
+      <div class="col">
+        <div class="card pad" style="display:flex;flex-direction:column;gap:13px"><div class="h14">Utilisation this week</div>${utilRows}</div>
+        <div class="card rounded"><div class="card-h"><div class="t">Activity</div></div><div style="padding:14px 18px;display:flex;flex-direction:column;gap:14px">${act}</div></div>
+        ${decisions}
+      </div>
+    </div></div>`;
+}
+
+/* ============ LEADS ============ */
+const LEAD_STAGES = [['new','New (GHL)'],['call1','Call 1 booked'],['engaged','In engagement'],['proposal','Proposal — letter out'],['won','Won → Project'],['lost','Lost / Nurture']];
+function leadCard(l){
+  const svc = SERVICE[l.service];
+  const meta = l.fee?`${svc} · ${k(l.fee)} est.`:svc;
+  let tag='';
+  if(l.stage==='won') tag=`<span class="chip brand sm" onclick="event.stopPropagation();go('#/project/${l.project}')" style="cursor:pointer">${l.project} created</span>`;
+  else if(l.eng) tag=`<span class="chip accent sm" onclick="event.stopPropagation();go('#/engagement/${l.eng}')" style="cursor:pointer">${l.eng} · ${ESTAGE[engStage(eng(l.eng))][0]}</span>`;
+  else if(l.tag) tag=`<span class="chip sm ${l.tag.includes('e-sign')?'attn':''}">${l.tag}</span>`;
+  else if(l.stage==='lost') tag=`<span class="chip sm">${l.reason}</span>`;
+  const adv = ['won','lost'].includes(l.stage)?'':l.stage==='call1'&&!l.eng?`<button class="adv" title="Open engagement (Call 1 held)" onclick="event.stopPropagation();openEngagement(DB.leads.find(x=>x.id==='${l.id}'))">→</button>`:l.eng?'':`<button class="adv" title="Advance one stage" onclick="event.stopPropagation();advanceLead('${l.id}')">→</button>`;
+  return `<div class="bcard" draggable="true" ondragstart="dragStart(event,'lead','${l.id}')" onclick="${l.client?`go('#/client/${l.client}')`:`toast('Lead <b>${esc(l.company)}</b> — opens the client/lead record (not yet qualified, so no client record exists).')`}">
+    <div class="n">${esc(l.company)}</div><div class="m">${meta}</div>
+    <div class="f"><span class="chip sm">${l.src}</span>${tag}${adv}</div></div>`;
+}
+function leads(r){
+  const view = r.q.view||S.leadView; S.leadView=view;
+  const pills = ['pipeline','list','forecast','triage'].map(v=>`<span class="pill${view===v?' active':''}" onclick="go('#/leads?view=${v}')">${v[0].toUpperCase()+v.slice(1)}</span>`).join('');
+  const open = DB.leads.filter(l=>!['won','lost'].includes(l.stage));
+  const weighted = open.reduce((s,l)=>s+l.fee*l.p/100,0);
+  const won=DB.leads.filter(l=>l.stage==='won').length, lost=DB.leads.filter(l=>l.stage==='lost').length;
+  const toolbar = `<div class="toolbar"><div class="pills">${pills}</div><select class="btn"><option>Source: all</option><option>Google Ads</option><option>Referral</option><option>LinkedIn</option><option>Website</option></select><select class="btn"><option>Service line: all</option><option>Valuation</option><option>Business plan</option><option>Feasibility</option></select><div class="spacer"></div><span class="chip attn" style="padding:6px 12px;font-size:11px;cursor:pointer" onclick="DB.ghlSynced='just now';render();toast('GoHighLevel sync requested — webhook backlog checked, 0 new records.')">⟳ GoHighLevel synced ${DB.ghlSynced}</span></div>`;
+  const footer = `<div class="card pad" style="display:flex;gap:28px;font-size:12px"><span class="muted">Weighted pipeline <b style="color:var(--text)">${k(weighted)}</b></span><span class="muted">Avg. lead → engagement letter <b style="color:var(--text)">11 days</b></span><span class="muted">Win rate <b style="color:var(--text)">${Math.round(won/(won+lost)*100)}%</b></span></div>`;
+  let body='';
+  if(view==='pipeline'){
+    const cols = LEAD_STAGES.map(([st,label])=>{
+      const items = DB.leads.filter(l=>l.stage===st);
+      const collapsed = st==='lost'&&!S.lostOpen;
+      const cards = collapsed?`<div class="ghost" style="font-size:11px;text-align:center;padding:10px;cursor:pointer" onclick="S.lostOpen=true;render()">collapsed — show ${items.length}</div>`:items.map(leadCard).join('');
+      return `<div class="bcol" ondragover="dragOver(event)" ondragleave="this.classList.remove('over')" ondrop="dropLead(event,'${st}')"><div class="bh"><span>${label}</span><span>${items.length}</span></div>${cards}${st==='lost'&&S.lostOpen?`<div class="ghost" style="font-size:11px;text-align:center;cursor:pointer" onclick="S.lostOpen=false;render()">collapse</div>`:''}</div>`;
+    }).join('');
+    body = `<div class="board" style="grid-template-columns:repeat(6,1fr)">${cols}</div>`;
+  } else if(view==='list'||view==='forecast'){
+    const rows = DB.leads.filter(l=>view==='list'||!['won','lost'].includes(l.stage)).map(l=>`<div class="trow click" style="grid-template-columns:1.4fr 1fr 1.1fr .6fr .5fr .6fr .8fr" onclick="${l.client?`go('#/client/${l.client}')`:'void 0'}"><span>${esc(l.company)}</span><span class="muted">${SERVICE[l.service]}</span><span class="muted">${LEAD_STAGES.find(x=>x[0]===l.stage)[1]}</span><span>${l.fee?k(l.fee):'—'}</span><span class="muted">${l.p}%</span><span class="muted">${l.close||'—'}</span><span class="muted">${l.src}</span></div>`).join('');
+    body = `<div class="card rounded"><div class="card-h"><div class="t">${view==='forecast'?'Pipeline forecast':'All leads'}</div><div class="spacer"></div><button class="btn sm" onclick="toast('Export → XLSX (would download).')">Export</button></div><div class="thead" style="grid-template-columns:1.4fr 1fr 1.1fr .6fr .5fr .6fr .8fr">Lead<span>Service</span><span>Stage</span><span>Fee</span><span>P%</span><span>Close</span><span>Source</span></div>${rows}</div>`;
+  } else {
+    const items = DB.leads.filter(l=>l.stage==='new');
+    const sel = DB.leads.find(l=>l.id===S.triageSel)||items[0];
+    const list = items.map(l=>`<div class="trow click${sel&&sel.id===l.id?' attn':''}" style="grid-template-columns:1fr auto" onclick="S.triageSel='${l.id}';render()"><span>${esc(l.company)}</span><span class="chip sm">${l.src}</span></div>`).join('');
+    const detail = sel?`<div style="display:flex;flex-direction:column;gap:12px"><div class="h14">${esc(sel.company)}</div>
+      <div><div class="kv"><span class="k">GHL contact</span><span>ghl_${sel.id.toLowerCase()}_8812 · matched: none</span></div><div class="kv"><span class="k">Form</span><span>“${SERVICE[sel.service]} enquiry” · ${sel.src}</span></div><div class="kv"><span class="k">Service line</span><span>${SERVICE[sel.service]} <span class="faint">(mapped from form field)</span></span></div><div class="kv"><span class="k">Contact</span><span>info@${sel.company.toLowerCase().replace(/[^a-z]/g,'')}.com · +357 99 ••• •••</span></div><div class="kv"><span class="k">UTM</span><span class="faint">google / cpc / valuation-cy-2026</span></div><div class="kv"><span class="k">Received</span><span>Today 06:12 · mapping v3</span></div></div>
+      <div class="hint">Every import is accepted, corrected or discarded exactly once. Nothing is written back to GoHighLevel.</div>
+      <div style="display:flex;gap:8px"><button class="btn primary" onclick="triage('${sel.id}','qualifying')">Qualify</button><button class="btn" onclick="triage('${sel.id}','nurture')">Nurture</button><button class="btn" onclick="triage('${sel.id}','discard')">Discard</button></div></div>`:`<div class="empty">Inbox clear — every GoHighLevel import has been triaged.</div>`;
+    body = `<div style="display:grid;grid-template-columns:1fr 1.4fr;gap:14px;align-items:start"><div class="card rounded"><div class="card-h"><div class="t">Untriaged imports</div><div class="spacer"></div><span class="s">${items.length}</span></div>${list||'<div class="empty" style="margin:14px">Nothing waiting.</div>'}</div><div class="card pad">${detail}</div></div>`;
+  }
+  return `<div class="col">${toolbar}${body}${footer}</div>`;
+}
+function triage(id,action){
+  const l = DB.leads.find(x=>x.id===id);
+  if(action==='qualifying'){l.stage='qualifying';l.p=25;l.fee=l.fee||15000;toast(`<b>${esc(l.company)}</b> qualified → client record created (lifecycle: lead).`,'ok');}
+  else if(action==='nurture'){l.stage='lost';l.reason='timing — nurture';toast(`<b>${esc(l.company)}</b> moved to nurture.`);}
+  else {DB.leads.splice(DB.leads.indexOf(l),1);toast(`Import discarded. Logged in ghl_import as <i>discarded</i>.`);}
+  S.triageSel=null;render();
+}
+function advanceLead(id){
+  const l = DB.leads.find(x=>x.id===id);
+  const order = ['new','call1','engaged','proposal','won'];
+  const i = order.indexOf(l.stage); if(i<0||i>=order.length-1) return;
+  moveLead(l,order[i+1]);
+}
+function moveLead(l,st){
+  if(st===l.stage) return;
+  if(st==='won'){toast('A lead is won when the engagement letter is signed and Invoice 1 is paid — open its engagement and finish the steps there.','err');return;}
+  if(st==='engaged'||st==='proposal'){if(l.eng){go('#/engagement/'+l.eng);return;}openEngagement(l);return;}
+  l.stage=st; l.p={new:10,call1:25,engaged:50,proposal:80,lost:0}[st]; l.tag=null;
+  if(st==='lost') l.reason='no reason recorded';
+  if(!l.fee&&st!=='new') l.fee=15000;
+  render();
+}
+function winLead(l){ if(l.eng){go('#/engagement/'+l.eng);return;} openEngagement(l);return;
+  // legacy (pre-engagement) conversion kept for reference
+
+  const code = 'PRJ-0'+(DB.nextProject++);
+  const entity = 'CY';
+  let c = l.client?client(l.client):null;
+  if(!c){c={id:'CLI-0'+(95+DB.clients.length),name:l.company+' Ltd',short:l.company,reg:'HE —',country:'Cyprus',industry:'—',currency:'EUR',entity,owner:'KM',source:l.src,lifecycle:'active',interest:SERVICE[l.service],contacts:[{n:'Primary contact',r:'Owner',primary:true,portal:true}],timeline:[]};DB.clients.push(c);}
+  const p = {code,client:c.id,clientName:c.short,title:SERVICE[l.service]+' — new engagement',service:l.service,stage:1,owner:'KM',reviewer:'AP',fee:l.fee||15000,due:'TBC',entity,status:'active',risk:'ok',time:0,wip:0,version:'v0.1',thread:[],comments:[],
+    data:CHECKLIST[l.service].slice(0,4).map(label=>({label,required:true,status:'requested',reminders:0})),
+    sections:SECTIONS[l.service].map(title=>({title,state:'todo'})),
+    tasks:[{t:'Send NDA',a:'KM',est:.5,st:'todo'},{t:'Issue engagement letter',a:'KM',est:1,st:'todo'},{t:'Issue deposit invoice',a:'EK',est:.5,st:'todo'},{t:'Request client data pack',a:'MA',est:1,st:'todo'},{t:'Kick-off call',a:'KM',est:1,st:'todo'}],start:'Today'};
+  DB.projects.unshift(p);
+  const pre = entity==='UK'?'UKI-':'INV-';
+  DB.invoices.push({num:pre+(DB.nextInv++),project:code,client:c.short,entity,type:'deposit_50',amount:p.fee/2,vat:0,currency:'EUR',status:'draft',issued:'—',due:'—'});
+  DB.invoices.push({num:pre+(DB.nextInv++),project:code,client:c.short,entity,type:'final_50',amount:p.fee/2,vat:0,currency:'EUR',status:'draft',issued:'—',due:'—'});
+  l.stage='won';l.p=100;l.project=code;l.client=c.id;l.tag=null;
+  c.timeline.unshift({t:`<b>${code} created</b> from won lead`,m:'Just now · automated',auto:true});
+  log('brand',`<b>${code}</b> created from won lead — ${esc(l.company)}`,'Automated · just now',`#/project/${code}`);
+  render();
+  toast(`Lead won. In one transaction: <b>${code}</b> created from the ${SERVICE[l.service]} template (8 stages, ${p.tasks.length} tasks, ${p.data.length} data requests), portal user invited, and both 50% invoices scheduled.`,'ok');
+}
+/* drag & drop */
+let DRAG=null;
+function dragStart(e,type,id){DRAG={type,id};e.dataTransfer.effectAllowed='move';}
+function dragOver(e){e.preventDefault();e.currentTarget.classList.add('over');}
+function dropLead(e,st){e.preventDefault();e.currentTarget.classList.remove('over');if(!DRAG||DRAG.type!=='lead')return;const l=DB.leads.find(x=>x.id===DRAG.id);DRAG=null;moveLead(l,st);}
+function dropTask(e,code,st){e.preventDefault();e.currentTarget.classList.remove('over');if(!DRAG||DRAG.type!=='task')return;const p=proj(code);const t=p.tasks[+DRAG.id];DRAG=null;t.st=st;if(st==='done')t.active=false;render();}
+
+/* ============ CLIENTS ============ */
+function clientsList(r){
+  const rows = DB.clients.map(c=>{const n=DB.projects.filter(p=>p.client===c.id).length;const lead=DB.leads.find(l=>l.client===c.id&&!['won','lost'].includes(l.stage));return `<div class="trow click" style="grid-template-columns:1.5fr .7fr .8fr 1fr .5fr .5fr .9fr" onclick="go('#/client/${c.id}')"><span>${esc(c.name)}</span><span class="muted">${c.id}</span><span class="muted">${c.country}</span><span>${lead?`<span class="chip attn sm">Lead · ${LEAD_STAGES.find(x=>x[0]===lead.stage)[1]}</span>`:`<span class="chip sm">${c.lifecycle==='active'?'Active client':'Lead'}</span>`}</span><span class="muted">${c.owner}</span><span class="muted">${n}</span><span class="muted">${c.source}</span></div>`;}).join('');
+  return `<div class="col"><div class="toolbar"><div class="pills"><span class="pill active">All</span><span class="pill">Active</span><span class="pill">Leads</span><span class="pill">Dormant</span></div><select class="btn"><option>Entity: all</option><option>${ENTITY.CY}</option><option>${ENTITY.UK}</option></select><div class="spacer"></div><button class="btn primary" onclick="openCreate('client')">+ Client</button></div>
+    <div class="card rounded"><div class="thead" style="grid-template-columns:1.5fr .7fr .8fr 1fr .5fr .5fr .9fr">Legal name<span>ID</span><span>Country</span><span>Lifecycle</span><span>Owner</span><span>Projects</span><span>Source</span></div>${rows}</div></div>`;
+}
+function clientRecord(r){
+  const c = client(r.id); if(!c) return `<div class="empty">Client not found.</div>`;
+  const tab = r.q.tab||'overview';
+  const lead = DB.leads.find(l=>l.client===c.id&&!['won','lost'].includes(l.stage));
+  const projects = DB.projects.filter(p=>p.client===c.id);
+  const ini = c.short.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const tabs = [['overview','Overview'],['contacts','Contacts'],['projects',`Projects (${projects.length})`],['documents','Documents'],['invoices','Invoices'],['notes','Emails & notes'],['compliance','Compliance']].map(([t,l])=>`<span class="tab${tab===t?' active':''}" onclick="go('#/client/${c.id}?tab=${t}')">${l}</span>`).join('');
+  const header = `<div class="card pad" style="display:flex;align-items:center;gap:14px"><div class="avatar sq" style="width:42px;height:42px">${ini}</div><div><div style="font:600 17px Newsreader,serif">${esc(c.name)}</div><div class="sub11">${c.id} · ${c.country} · ${c.industry} · Owner: ${USERS[c.owner].first} · Source: ${c.source}</div></div><div class="spacer"></div>
+    ${lead?`<span class="chip attn" style="padding:5px 10px;font-size:11px">Stage · ${LEAD_STAGES.find(x=>x[0]===lead.stage)[1]}</span><button class="btn primary" onclick="winLead(DB.leads.find(l=>l.id==='${lead.id}'))">Convert to engagement</button>`:`<span class="chip" style="padding:5px 10px;font-size:11px">Active client · ${projects.filter(p=>p.status==='active').length} live</span><button class="btn primary" onclick="openCreate('project','${c.id}')">+ Project</button>`}</div>`;
+  let body='';
+  if(tab==='overview'){
+    const det = `<div class="card pad"><div class="h13" style="margin-bottom:8px">Details</div><div class="kv"><span class="k">Legal name</span><span>${esc(c.name)}</span></div><div class="kv"><span class="k">Reg. no.</span><span>${c.reg}</span></div><div class="kv"><span class="k">Contracting entity</span><span>${ENTITY[c.entity]}</span></div><div class="kv"><span class="k">Currency</span><span>${c.currency}</span></div><div class="kv"><span class="k">Service interest</span><span>${c.interest}</span></div></div>
+      <div class="card pad"><div class="h13" style="margin-bottom:10px">Contacts</div><div style="display:flex;flex-direction:column;gap:10px">${c.contacts.map(ct=>`<div style="display:flex;gap:9px;align-items:center"><div class="avatar" style="width:26px;height:26px">${ct.n.split(' ').map(w=>w[0]).join('')}</div><div><div class="w500" style="font-size:12px">${esc(ct.n)}</div><div class="muted" style="font-size:10.5px">${ct.r}${ct.primary?' · primary':''}${ct.billing?' · billing':''}${ct.portal?' · portal access ✓':''}</div></div></div>`).join('')}</div></div>`;
+    const tl = c.timeline.length?c.timeline.map((e,i)=>`<div style="display:flex;gap:10px"><div style="width:7px;height:7px;border-radius:50%;margin-top:5px;flex:none;background:${i===0?'var(--brand)':e.auto?'var(--accent)':'var(--inactive)'}"></div><div><div style="font-size:11.5px;font-weight:500">${e.t}</div><div class="faint" style="font-size:10.5px">${e.m}</div></div></div>`).join(''):`<div class="ghost" style="font-size:11.5px">No events yet. Emails, calls, uploads and stage changes will appear here.</div>`;
+    const eng = projects.length?`<div class="thead" style="grid-template-columns:1.6fr 1fr .6fr;padding:9px 0;background:transparent;margin-top:4px">Project<span>Stage</span><span>Fee</span></div>${projects.map(p=>`<div class="trow click" style="grid-template-columns:1.6fr 1fr .6fr;padding:9px 0" onclick="go('#/project/${p.code}')"><span>${p.code} ${esc(p.title)}</span><span class="${p.status==='delivered'?'success':'muted'}">${p.status==='delivered'?'Delivered':STAGES[p.stage-1]}</span><span>${k(p.fee)}</span></div>`).join('')}`:`<div class="ghost" style="font-size:11.5px;margin-top:6px">No engagements yet — win the lead to create the first project from a template.</div>`;
+    const mid = `<div class="card pad"><div class="h13" style="margin-bottom:10px">Timeline <span class="sub11" style="font-weight:400">auto + manual</span></div><div style="display:flex;flex-direction:column;gap:11px">${tl}</div></div><div class="card pad"><div class="h13">Engagements</div>${eng}</div>`;
+    const na = lead?{t:lead.stage==='proposal_nda'?'Chase NDA signature':lead.stage==='eng_letter'?'Chase engagement letter e-sign':'Qualify: scoping call',m:'Due today · assigned to you'}:projects.find(p=>p.status==='active'&&gate(p))?{t:gate(projects.find(p=>p.status==='active'&&gate(p))).reason,m:'From the live engagement'}:{t:'No open action',m:'Everything on track'};
+    const right = `<div class="card pad attn"><div class="h13">Next action</div><div style="font-size:12px;margin-top:6px">${na.t}</div><div class="sub11" style="color:var(--text-3)">${na.m}</div></div>
+      <div class="card pad"><div class="h13" style="margin-bottom:8px">Compose</div><textarea class="ta" placeholder="Write an email or an internal note…"></textarea><div style="display:flex;gap:6px;margin-top:8px"><button class="btn sm" onclick="toast('Email sent and logged to the timeline.')">Email</button><button class="btn sm" onclick="toast('Internal note saved to the timeline.')">Note</button><button class="btn sm brand-o" onclick="toast('✦ AI draft written to the composer. A person must review and send — AI output is never sent to a client automatically.')">✦ AI draft</button></div></div>
+      <div class="drop">Drop files here — NDA, engagement letter, FS…</div>`;
+    body = `<div style="display:grid;grid-template-columns:1fr 1.25fr .85fr;gap:14px;align-items:start"><div class="col" style="gap:14px">${det}</div><div class="col" style="gap:14px">${mid}</div><div class="col" style="gap:14px">${right}</div></div>`;
+  } else if(tab==='contacts'){
+    body = `<div class="card rounded"><div class="thead" style="grid-template-columns:1.2fr 1fr 1fr .6fr .6fr .7fr">Name<span>Role</span><span>Email</span><span>Primary</span><span>Billing</span><span>Portal</span></div>${c.contacts.map(ct=>`<div class="trow" style="grid-template-columns:1.2fr 1fr 1fr .6fr .6fr .7fr"><span>${esc(ct.n)}</span><span class="muted">${ct.r}</span><span class="muted">${ct.n.split(' ')[0].toLowerCase()}@${c.short.toLowerCase().replace(/[^a-z]/g,'')}.com</span><span>${ct.primary?'✓':'—'}</span><span>${ct.billing?'✓':'—'}</span><span>${ct.portal?'<span class="success">active</span>':'<button class="btn sm" onclick="toast(\'Portal invitation sent.\')">Invite</button>'}</span></div>`).join('')}<div class="legend">Portal users see only this client's records with visibility = client.</div></div>`;
+  } else if(tab==='projects'){
+    body = projectsTable(projects);
+  } else if(tab==='documents'){
+    body = docsTable(DB.documents.filter(d=>d.client===c.short));
+  } else if(tab==='invoices'){
+    body = invoicesTable(DB.invoices.filter(i=>i.client===c.short));
+  } else if(tab==='notes'){
+    body = `<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;align-items:start"><div class="card pad"><div class="h13" style="margin-bottom:10px">Emails & notes</div><div style="display:flex;flex-direction:column;gap:11px">${c.timeline.map(e=>`<div style="display:flex;gap:10px"><div style="width:7px;height:7px;border-radius:50%;margin-top:5px;flex:none;background:${e.auto?'var(--accent)':'var(--inactive)'}"></div><div><div style="font-size:11.5px;font-weight:500">${e.t}</div><div class="faint" style="font-size:10.5px">${e.m}</div></div></div>`).join('')||'<div class="ghost">Nothing logged yet.</div>'}</div></div><div class="card pad"><div class="h13" style="margin-bottom:8px">Compose</div><textarea class="ta" placeholder="Write an email or an internal note…"></textarea><div style="display:flex;gap:6px;margin-top:8px"><button class="btn sm">Email</button><button class="btn sm">Note</button><button class="btn sm brand-o">✦ AI draft</button></div></div></div>`;
+  } else {
+    body = `<div class="card pad" style="max-width:560px"><div class="h13" style="margin-bottom:8px">Compliance</div>${[['KYC / identity of UBOs','complete','success'],['Sanctions & PEP screening','complete · 21 Aug','success'],['Engagement letter on file','signed','success'],['Conflict check','not recorded','danger'],['Source of funds (for deposit)','n/a','muted']].map(([a,b,cl])=>`<div class="kv"><span class="k">${a}</span><span class="${cl}">${b}</span></div>`).join('')}<div class="hint" style="margin-top:10px">Compliance fields were not in the design handover — placeholder content to show where they'd live.</div></div>`;
+  }
+  return `<div class="col" style="gap:14px">${header}<div class="tabs">${tabs}</div>${body}</div>`;
+}
+
+/* ============ PROJECTS LIST ============ */
+function pips(p){
+  return `<span class="pips">${STAGES.map((_,i)=>{const s=i+1;let cl='';if(p.status==='delivered'||s<p.stage)cl='done';else if(s===p.stage)cl=blocked(p)?'blk':'cur';return `<i class="${cl}"></i>`;}).join('')}</span>`;
+}
+function projectsTable(list){
+  const rows = list.map(p=>{const b=blocked(p);return `<div class="trow click${b?' attn':''}" style="grid-template-columns:.62fr 1.1fr .82fr 2.1fr .5fr .55fr .62fr;gap:11px;padding:12px 15px" tabindex="0" onclick="go('#/project/${p.code}')"><span>${p.code}</span><span>${esc(p.clientName)}</span><span class="muted">${SERVICE[p.service]}</span>${pips(p)}<span class="muted">${p.owner}</span><span>${k(p.fee,p.entity==='UK'?'GBP':'EUR')}</span><span class="${p.overdue?'danger w500':'muted'}">${p.due}</span></div>`;}).join('');
+  return `<div class="card rounded"><div class="thead" style="grid-template-columns:.62fr 1.1fr .82fr 2.1fr .5fr .55fr .62fr;gap:11px;padding:9px 15px">Code<span>Client</span><span>Service</span><span>Stage</span><span>Owner</span><span>Fee</span><span>Due</span></div>${rows||'<div class="empty" style="margin:14px">No projects match this filter.</div>'}<div class="legend">Stages: Before this: the engagement (deposit → NDA → financials → Call 2 → letter → Invoice 1) &nbsp;·&nbsp; 1 Data top-up · 2 Draft · 3 Internal review · 4 Client review · 5 Final report + Invoice 2 · 6 Closed &nbsp;·&nbsp; <span style="color:var(--brand)">■</span> done <span style="color:var(--accent)">■</span> current <span style="color:var(--danger)">■</span> blocked by a gate</div></div>`;
+}
+function projectsList(r){
+  const f = r.q.filter||(r.q.stage?'stage':'live'); const stage=+r.q.stage||0; const svc=r.q.svc||'all'; const ent=r.q.ent||'all';
+  let list = DB.projects.slice();
+  if(f==='live') list=list.filter(p=>p.status==='active');
+  else if(f==='mine') list=list.filter(p=>p.status==='active'&&(p.owner===S.role||p.reviewer===S.role));
+  else if(f==='risk') list=list.filter(p=>p.status==='active'&&(blocked(p)||p.risk==='at_risk'||p.overdue));
+  else if(f==='delivered') list=list.filter(p=>p.status==='delivered');
+  else if(f==='review') list=list.filter(p=>p.status==='active'&&(p.stage===6||p.stage===7));
+  else if(f==='stage') list=list.filter(p=>p.status==='active'&&p.stage===stage);
+  if(svc!=='all') list=list.filter(p=>p.service===svc);
+  if(ent!=='all') list=list.filter(p=>p.entity===ent);
+  const q = (o)=>{const m=Object.assign({filter:f,stage,svc,ent},o);return '#/projects?'+Object.entries(m).filter(([a,b])=>b&&b!=='all'&&!(a==='stage'&&!b)).map(([a,b])=>a+'='+b).join('&');};
+  const pills = [['live','All live'],['mine','Mine'],['risk','At risk'],['delivered','Delivered']].map(([v,l])=>`<span class="pill${f===v?' active':''}" onclick="go('${q({filter:v,stage:0})}')">${l}</span>`).join('');
+  const chip = f==='stage'?`<span class="chip attn" style="padding:5px 10px;font-size:11px">Stage: ${STAGES[stage-1]} <span style="cursor:pointer;margin-left:6px" onclick="go('${q({filter:'live',stage:0})}')">✕</span></span>`:f==='review'?`<span class="chip attn" style="padding:5px 10px;font-size:11px">In review (internal + client) <span style="cursor:pointer;margin-left:6px" onclick="go('${q({filter:'live'})}')">✕</span></span>`:'';
+  return `<div class="col"><div class="toolbar"><div class="pills">${pills}</div>${chip}<select class="btn" onchange="go('${q({})}'.replace(/&svc=[^&]*/,'')+'&svc='+this.value)"><option value="all"${svc==='all'?' selected':''}>Service line: all</option>${Object.entries(SERVICE).slice(0,3).map(([v,l])=>`<option value="${v}"${svc===v?' selected':''}>${l}</option>`).join('')}</select><select class="btn" onchange="go('${q({})}'.replace(/&ent=[^&]*/,'')+'&ent='+this.value)"><option value="all"${ent==='all'?' selected':''}>Entity: all</option><option value="CY"${ent==='CY'?' selected':''}>${ENTITY.CY}</option><option value="UK"${ent==='UK'?' selected':''}>${ENTITY.UK}</option></select><div class="spacer"></div><button class="btn primary" onclick="openCreate('project')">+ Project</button></div>${projectsTable(list)}</div>`;
+}
+</script>
+<script>
+/* ============ PROJECT DETAIL ============ */
+function advanceStage(code){
+  const p = proj(code); const g = gate(p);
+  if(g){toast(`<b>Stage advance rejected by the server.</b> ${g.reason}.`,'err');render();return;}
+  if(p.stage===5){p.stage=6;p.status='delivered';p.due='closed today';const e=p.engagement&&eng(p.engagement);if(e)engLog(e,'Project closed — Invoice 2 paid');log('inactive',`${USERS[S.role].first} closed <b>${p.code}</b>`,'Just now',`#/project/${p.code}`);toast(`<b>${p.code}</b> closed. Invoice 2 paid, final report on file.`,'ok');render();return;}
+  p.stage++;
+  if(p.stage===5){const f=finalInv(p);if(f&&f.status==='draft'){f.status='sent';f.issued='Today';f.due='+15 days';if(f.num.endsWith('—')){f.num=f.num.replace('—',engNextInvNo(f.entity));}const e=p.engagement&&eng(p.engagement);if(e){const i2=e.invoices.find(x=>x.seq===2);if(i2){i2.status='issued';i2.number=+f.num.split('#')[1];i2.ref='#'+i2.number;i2.issued='Today';i2.due='+15 days';}}}}
+  log('inactive',`${USERS[S.role].first} advanced <b>${p.code}</b> to ${STAGES[p.stage-1]}`,'Just now',`#/project/${p.code}`);
+  toast(`<b>${p.code}</b> → ${STAGES[p.stage-1]}.${p.stage===5?' Final report delivered — Invoice 2 generated and emailed.':''}`,'ok');
+  render();
+}
+function markData(code,i,st){const p=proj(code);const d=p.data[i];d.status=st;if(st==='received'){const t=p.tasks.find(t=>t.st!=='done'&&t.t.toLowerCase().startsWith('chase')&&t.t.toLowerCase().includes(d.label.toLowerCase().split(' ')[0]));if(t)t.st='done';}render();toast(`${esc(d.label)} → <b>${st}</b>${st==='received'?' · chase task closed':''}.`,'ok');}
+function remind(code,i){const p=proj(code);p.data[i].reminders++;render();toast(`Reminder sent to the client for <b>${esc(p.data[i].label)}</b> (chased ×${p.data[i].reminders}).`);}
+function resolveComment(code,i){const p=proj(code);p.comments[i].resolved=true;render();}
+function commentToTask(code,i){const p=proj(code);const c=p.comments[i];p.tasks.unshift({t:'Address: '+c.body.slice(0,42)+'…',a:p.owner,est:1,st:'todo',src:'comment'});c.task=true;render();toast('Task created from the comment (task.source = comment).','ok');}
+function sendMsg(code){const p=proj(code);const ta=$('msg');if(!ta||!ta.value.trim())return;p.thread.push({who:USERS[S.role].name,client:false,internal:S.noteInternal,body:ta.value.trim(),at:'Just now'});render();}
+function toggleDone(code){S.doneOpen[code]=!S.doneOpen[code];render();}
+
+function stepper(p){
+  return `<div class="stepper">${STAGES.map((s,i)=>{const n=i+1;const cl=p.status==='delivered'||n<p.stage?'done':n===p.stage?'cur'+(blocked(p)?' blk':''):'';return `<div class="step ${cl}" onclick="toast('Stage <b>${s}</b> — ${n<p.stage?'completed':n===p.stage?'in progress':'not started'}. Gate: ${['Invoice 1 paid','data complete','comments resolved','client comments resolved','Invoice 2 paid','—'][i]}.')"><div class="bar"></div><div class="lb">${s}${n<p.stage||p.status==='delivered'?' ✓':''}</div></div>`;}).join('')}</div>`;
+}
+function projectDetail(r){
+  const p = proj(r.id); if(!p) return `<div class="empty">Project not found.</div>`;
+  const tab = r.q.tab||'tasks'; const g = gate(p); const c = client(p.client); const cur=p.entity==='UK'?'GBP':'EUR';
+  const header = `<div class="card pad" style="display:flex;align-items:center;gap:14px"><div><div style="font:600 17px Newsreader,serif">${p.code} · ${esc(p.clientName)} — ${esc(p.title)}</div><div class="sub11">${ENTITY[p.entity]} · ${k(p.fee,cur)} · Owner ${p.owner} · Reviewer ${p.reviewer} · Due ${p.due}${p.status==='delivered'?' · <span class="success">Delivered</span>':''}${p.risk==='at_risk'?' · <span class="danger">At risk</span>':p.risk==='watch'?' · <span class="muted">Watch</span>':''}</div></div><div class="spacer"></div>
+    <button class="btn" onclick="go('#/projects')">← All projects</button><button class="btn" onclick="S.portalProject='${p.code}';go('#/portal')">Preview portal ↗</button><button class="btn" onclick="openCreate('time','${p.code}')">Log time</button>${p.status==='active'?`<button class="btn primary" onclick="advanceStage('${p.code}')">${p.stage===5?'Close project':'Advance stage →'}</button>`:''}</div>`;
+  const gateStrip = g?`<div class="gate${g.hard?' hard':''}">⚠ ${g.reason}${g.hard?`<span class="spacer"></span><button class="btn sm" onclick="go('#/invoices?status=overdue')">Open invoice</button>`:''}</div>`:'';
+  const tabs = [['tasks','Tasks'],['deliverable','Deliverable & versions'],['data','Data checklist'],['docs','Documents'],['comments',`Review comments${unresolved(p)?` (${unresolved(p)})`:''}`],['time','Time & fees'],['thread','Client thread'],['history','History']].map(([t,l])=>`<span class="tab${tab===t?' active':''}" onclick="go('#/project/${p.code}?tab=${t}')">${l}</span>`).join('');
+  let body='';
+  if(tab==='tasks'){
+    const col = (st,label)=>{const items=p.tasks.map((t,i)=>({t,i})).filter(x=>x.t.st===st);const collapsed=st==='done'&&!S.doneOpen[p.code];
+      const cards = collapsed?`<div class="ghost" style="font-size:11px;text-align:center;padding:8px;cursor:pointer" onclick="toggleDone('${p.code}')">collapsed — show ${items.length}</div>`:items.map(({t,i})=>`<div class="bcard${t.active?' attn':''}" draggable="true" ondragstart="dragStart(event,'task','${i}')"><div style="font-size:11px;font-weight:500">${esc(t.t)}</div><div class="m">${t.a}${t.est?` · ${t.est}h est.`:''}${t.log?` · ${t.log}h logged`:''}${t.ai?' · <span class="accent">✦ AI first pass</span>':''}${t.comments?` · reviewer ${p.reviewer} · ${t.comments} comments`:''}${t.src==='comment'?' · <span class="faint">from comment</span>':''}${t.src==='auto'?' · <span class="faint">auto</span>':''}</div></div>`).join('');
+      return `<div class="bcol" ondragover="dragOver(event)" ondragleave="this.classList.remove('over')" ondrop="dropTask(event,'${p.code}','${st}')"><div class="bh"><span>${label}</span><span>${items.length}</span></div>${cards}${st==='done'&&S.doneOpen[p.code]?`<div class="ghost" style="font-size:11px;text-align:center;cursor:pointer" onclick="toggleDone('${p.code}')">collapse</div>`:''}</div>`;};
+    const board = `<div class="board" style="grid-template-columns:repeat(4,1fr)">${col('todo','To do')}${col('in_progress','In progress')}${col('review','Review')}${col('done','Done')}</div>`;
+    const dep = depositInv(p), fin = finalInv(p);
+    const right = `<div class="card pad"><div class="h13" style="margin-bottom:6px">Client data checklist</div>${p.data.map(d=>`<div class="kv"><span>${esc(d.label)}${d.required?'':' <span class="faint">(optional)</span>'}</span><span class="${d.status==='received'?'success':d.reminders?'danger':'muted'}">${d.status==='received'?'✓':d.status==='waived'?'waived':d.reminders?`chased ×${d.reminders}`:'requested'}</span></div>`).join('')}</div>
+      <div class="card pad"><div class="h13" style="margin-bottom:6px">Deliverable</div><div class="kv"><span>${p.service==='valuation'?'Valuation report':p.service==='feasibility'?'Feasibility study':'Business plan'}</span><span class="muted">${p.version}</span></div><div class="skel" style="height:54px;margin:8px 0"></div><div style="display:flex;gap:6px"><button class="btn sm" onclick="go('#/project/${p.code}?tab=deliverable')">Versions</button><button class="btn sm primary" onclick="${p.stage>=3&&!unresolved(p)?`toast('Draft ${p.version} shared to the client portal. Client review started.','ok')`:`toast('<b>Cannot send.</b> ${p.stage<3?'Draft not yet through internal review':unresolved(p)+' review comments unresolved'} — gate rule.','err')`}">Send to client</button></div></div>
+      <div class="card pad"><div class="h13" style="margin-bottom:6px">Fees</div><div class="kv"><span class="k">Deposit 50%</span><span class="${dep.status==='paid'?'':dep.status==='overdue'?'danger':'muted'}">${money(dep.amount,dep.currency)} ${dep.status==='paid'?'paid':dep.status==='overdue'?`overdue ${dep.daysOver||''}d`:dep.status}</span></div><div class="kv"><span class="k">Final 50%</span><span class="${fin.status==='paid'?'':'muted'}">${fin.status==='paid'?money(fin.amount,fin.currency)+' paid':fin.status==='sent'?money(fin.amount,fin.currency)+' issued':'on signature'}</span></div><div class="kv"><span class="k">Time logged</span><span>${p.time}h · ${money(p.wip,cur)} WIP</span></div></div>`;
+    body = `<div style="display:grid;grid-template-columns:2.2fr 1fr;gap:16px;align-items:start">${board}<div class="col" style="gap:14px">${right}</div></div>`;
+  } else if(tab==='deliverable'){
+    const secs = p.sections.map((s,i)=>`<div class="sec${s.state==='drafting'?' active':''}"><span class="muted" style="width:14px">${i+1}</span>${esc(s.title)}<span class="st">${s.state==='final'?'final':s.state==='reviewed'?'✓ reviewed':s.state==='drafted'?'drafted':s.state==='drafting'?'● drafting':'—'}</span></div>`).join('');
+    const rail = p.comments.length?p.comments.map((cm,i)=>`<div class="cmt${cm.resolved?' resolved':''}"><div class="who">${USERS[cm.by].name} · §${cm.s+1}${cm.resolved?' · resolved':''}</div><div>${esc(cm.body)}</div>${cm.resolved?'':`<div class="acts"><button class="btn sm" onclick="resolveComment('${p.code}',${i})">Resolve</button>${cm.task?'<span class="faint" style="font-size:10px;padding:5px 0">task created</span>':`<button class="btn sm" onclick="commentToTask('${p.code}',${i})">→ Task</button>`}</div>`}</div>`).join(''):'<div class="ghost" style="font-size:11.5px">No review comments yet. The reviewer adds them here, anchored to a section.</div>';
+    body = `<div style="display:grid;grid-template-columns:.8fr 2fr 1fr;gap:14px;align-items:start">
+      <div class="card pad" style="padding:10px"><div class="h13" style="padding:6px 10px 8px">Sections</div>${secs}<div style="padding:10px 10px 4px;display:flex;gap:6px"><button class="btn sm brand-o" onclick="toast('✦ AI first pass drafted for §3 Market. Saved as ai_draft — Maria must accept it before it enters the document.')">✦ AI first pass</button></div></div>
+      <div class="col" style="gap:10px"><div style="display:flex;align-items:center;gap:8px"><span class="chip">${p.version}</span><span class="faint" style="font-size:11px">edited today by Maria A.</span><div class="spacer"></div><button class="btn sm" onclick="toast('Version history: v0.4 (today) · v0.3 (30 Aug) · v0.2 (26 Aug) · v0.1 (22 Aug). Each version is a document row linked by supersedes_id.')">History</button><button class="btn sm" onclick="toast('Exported as PDF with Consortia letterhead (would download).')">Export PDF</button></div>
+        <div class="doc"><h4>3. Market</h4><p>${esc(p.clientName)} operates in a market that grew at roughly 11% a year between 2022 and 2025, driven by regulatory pressure on incumbents and the shift of mid-market buyers toward subscription models. We estimate the addressable segment at €140–160m across Cyprus and Greece.</p><p>The company's share sits at 6–7% by revenue. Three competitors account for half the market; none has a comparable presence in the public-sector niche that produces 40% of ${esc(p.clientName)}'s recurring revenue.</p><p class="faint" style="font-style:italic">[✦ AI first pass — pending analyst review. Sources to verify: market size figure, competitor share.]</p><p>Pricing has been stable. Churn of 8% in FY25 compares favourably with a peer median of 12%, which supports the growth assumptions carried into §4 and the terminal value in §5.</p></div></div>
+      <div class="card pad" style="padding:12px;display:flex;flex-direction:column;gap:8px"><div class="h13">Review comments</div>${rail}</div></div>`;
+  } else if(tab==='data'){
+    const rows = p.data.map((d,i)=>`<div class="trow${d.reminders>=2&&d.status==='requested'?' attn':''}" style="grid-template-columns:1.6fr .6fr .8fr .8fr .7fr 1.4fr"><span>${esc(d.label)}</span><span class="muted">${d.required?'required':'optional'}</span><span class="${d.status==='received'?'success':d.status==='waived'?'muted':'danger'}">${d.status}</span><span class="muted">21 Jul</span><span class="${d.reminders?'danger':'muted'}">${d.reminders?`chased ×${d.reminders}`:'—'}</span><span style="display:flex;gap:5px">${d.status==='requested'?`<button class="btn sm" onclick="markData('${p.code}',${i},'received')">Mark received</button><button class="btn sm" onclick="remind('${p.code}',${i})">Remind</button><button class="btn sm" onclick="markData('${p.code}',${i},'waived')">Waive</button>`:d.status==='received'?`<span class="faint" style="font-size:11px;padding:4px 0">document attached</span>`:`<button class="btn sm" onclick="markData('${p.code}',${i},'requested')">Re-request</button>`}</span></div>`).join('');
+    body = `<div class="card rounded"><div class="card-h"><div class="t">Client data checklist</div><span class="s">${p.data.filter(d=>d.status==='received').length} of ${p.data.length} received · instantiated from the ${SERVICE[p.service]} template</span><div class="spacer"></div><button class="btn sm" onclick="toast('Add a checklist item (label, required, due).')">+ Item</button></div><div class="thead" style="grid-template-columns:1.6fr .6fr .8fr .8fr .7fr 1.4fr">Item<span>Required</span><span>Status</span><span>Requested</span><span>Reminders</span><span>Actions</span></div>${rows}<div class="legend">Reminders go out automatically on a schedule while an item is outstanding. A client upload in the portal flips the item to received and closes the internal chase task.</div></div>`;
+  } else if(tab==='docs'){
+    body = `<div class="col" style="gap:14px">${docsTable(DB.documents.filter(d=>d.project===p.code))}<div class="drop">Drop files here — choose <b>internal</b> or <b>client</b> visibility on upload</div></div>`;
+  } else if(tab==='comments'){
+    const rows = p.comments.length?p.comments.map((cm,i)=>`<div class="cmt${cm.resolved?' resolved':''}"><div class="who">${USERS[cm.by].name} · §${cm.s+1} ${esc(p.sections[cm.s]?p.sections[cm.s].title:'')}${cm.resolved?' · resolved':''}</div><div>${esc(cm.body)}</div>${cm.resolved?'':`<div class="acts"><button class="btn sm" onclick="resolveComment('${p.code}',${i})">Resolve</button>${cm.task?'<span class="faint" style="font-size:10px;padding:5px 0">task created</span>':`<button class="btn sm" onclick="commentToTask('${p.code}',${i})">→ Task</button>`}</div>`}</div>`).join(''):'<div class="empty">No review comments. They\'re added by the reviewer during Internal review, anchored to a report section.</div>';
+    body = `<div style="max-width:720px;display:flex;flex-direction:column;gap:8px">${unresolved(p)?`<div class="gate">⚠ ${unresolved(p)} unresolved — Client review cannot start until these are cleared.</div>`:''}${rows}</div>`;
+  } else if(tab==='time'){
+    const rec = DB.time.recovery.find(x=>x.p===p.code)||{pct:Math.round(p.wip/p.fee*100)};
+    body = `<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px;align-items:start">
+      <div class="card rounded"><div class="card-h"><div class="t">Time entries</div><div class="spacer"></div><button class="btn sm" onclick="openCreate('time','${p.code}')">+ Log time</button></div><div class="thead" style="grid-template-columns:.7fr 1.4fr .6fr .5fr .5fr">Date<span>Task</span><span>Who</span><span>Hours</span><span>Billable</span></div>${[['Today','DCF model — WACC','KM',2.5,'✓'],['Yesterday','Draft §3 Market','MA',3.5,'✓'],['31 Aug','Normalise EBITDA','MA',2,'✓'],['30 Aug','Client call','KM',1,'✓'],['28 Aug','Data pack chase','MA',.5,'—']].map(e=>`<div class="trow" style="grid-template-columns:.7fr 1.4fr .6fr .5fr .5fr"><span>${e[0]}</span><span>${e[1]}</span><span class="muted">${e[2]}</span><span>${e[3]}</span><span class="muted">${e[4]}</span></div>`).join('')}<div class="trow tot" style="grid-template-columns:.7fr 1.4fr .6fr .5fr .5fr"><span>Total</span><span></span><span></span><span>${p.time}h</span><span></span></div></div>
+      <div class="col" style="gap:14px"><div class="card pad"><div class="h13" style="margin-bottom:6px">Fee schedule</div>${DB.invoices.filter(i=>i.project===p.code).map(i=>`<div class="kv"><span class="k">${i.num} · ${i.type.replace('_50',' 50%').replace('_',' ')}</span><span class="${i.status==='overdue'?'danger':i.status==='paid'?'':'muted'}">${money(i.amount,i.currency)} · ${i.status}</span></div>`).join('')}</div>
+      <div class="card pad"><div class="h13" style="margin-bottom:8px">Recovery — billable vs fee</div><div class="util"><span class="n">${p.code}</span><div class="tr"><div class="fl" style="width:${Math.min(rec.pct,100)}%;${rec.pct>=100?'background:var(--danger)':''}"></div></div><span class="p ${rec.pct>=100?'danger':''}">${rec.pct}%</span></div><div class="hint" style="margin-top:8px">${money(p.wip,cur)} of time against a ${k(p.fee,cur)} fixed fee. Over 100% means the job is losing money.</div></div></div></div>`;
+  } else if(tab==='thread'){
+    const msgs = p.thread.length?p.thread.map(m=>`<div class="msg${m.client?'':' me'}${m.internal?' internal':''}"><div class="bub">${m.internal?'<span style="font-size:10px;opacity:.7">INTERNAL NOTE — not visible to client</span><br>':''}${esc(m.body)}</div><div class="mt">${esc(m.who)} · ${m.at}</div></div>`).join(''):'<div class="ghost" style="text-align:center;padding:20px">No messages yet. Everything here (except internal notes) is visible to the client in the portal.</div>';
+    body = `<div class="card pad" style="max-width:760px;display:flex;flex-direction:column;gap:12px"><div style="display:flex;flex-direction:column;gap:10px">${msgs}</div><div style="border-top:1px solid var(--border-sub);padding-top:12px;display:flex;flex-direction:column;gap:8px"><textarea class="ta" id="msg" placeholder="${S.noteInternal?'Internal note — the client will not see this':'Message the client — they see this in the portal'}"></textarea><div style="display:flex;gap:6px;align-items:center"><label style="font-size:11px;color:var(--muted);display:flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" ${S.noteInternal?'checked':''} onchange="S.noteInternal=this.checked;render()"> Internal note</label><div class="spacer"></div><button class="btn sm brand-o" onclick="document.getElementById('msg').value='Hi Paul — quick nudge on the 3-year forecast model and cap table. Those two are the last items before we can complete the draft. Happy to jump on a call if it helps.'">✦ AI draft</button><button class="btn sm primary" onclick="sendMsg('${p.code}')">Send</button></div></div></div>`;
+  } else {
+    const hist = [['Today 10:12','Kyriacos M.','message','internal note added to client thread'],['Today 09:41','Paul M. (portal)','document','uploaded Management accounts → data_request received'],['Today 08:02','system','invoice','CY #12 marked paid · €12,500 · bank transfer'],['Yesterday 17:40','Maria A.','project_stage','Data exchange → Draft'],['Yesterday 16:10','Andreas P.','review_comment','3 comments on §2'],['30 Aug','Maria A.','document','Valuation report v0.3 → v0.4'],['24 Jul','Paul M. (portal)','signature_request','Engagement letter signed'],['22 Jul','Paul M. (portal)','signature_request','NDA signed'],['20 Jul','system','project','created from won lead L14 · valuation template v2']];
+    body = `<div class="card rounded" style="max-width:820px"><div class="card-h"><div class="t">History</div><span class="s">append-only · from activity_log</span><div class="spacer"></div><button class="btn sm" onclick="toast('Exported history as PDF for the engagement file.')">Export</button></div><div class="thead" style="grid-template-columns:.8fr 1fr .9fr 2fr">When<span>Actor</span><span>Entity</span><span>Change</span></div>${hist.map(h=>`<div class="trow" style="grid-template-columns:.8fr 1fr .9fr 2fr"><span class="faint" style="font-weight:400">${h[0]}</span><span class="${h[1]==='system'?'accent':''}">${h[1]}</span><span class="muted">${h[2]}</span><span>${h[3]}</span></div>`).join('')}</div>`;
+  }
+  return `<div class="col" style="gap:14px">${header}<div class="card pad" style="display:flex;flex-direction:column;gap:12px">${stepper(p)}${gateStrip}</div><div class="tabs">${tabs}</div>${body}</div>`;
+}
+
+/* ============ DOCUMENTS ============ */
+const KIND = {nda:'NDA',eng_letter:'Engagement letter',fs:'Financial statements',mgmt_accounts:'Management accounts',forecast:'Forecast',cap_table:'Cap table',deliverable:'Deliverable',invoice:'Invoice',other:'Working paper'};
+function docsTable(list){
+  const rows = list.map((d,i)=>{const key=d.name+d.project;const open=S.docOpen===key;return `<div class="trow click" style="grid-template-columns:1.8fr 1fr .8fr .5fr 1fr .7fr .8fr .6fr" onclick="S.docOpen=S.docOpen==='${esc(key)}'?null:'${esc(key)}';render()"><span>${esc(d.name)}</span><span class="muted">${esc(d.client)}${d.project!=='—'?` · ${d.project}`:''}</span><span class="muted">${KIND[d.kind]}</span><span class="muted">v${d.v}${d.supersedes?' <span class="faint">↺</span>':''}</span><span class="muted">${esc(d.by)}</span><span><span class="chip sm${d.vis==='client'?' accent':''}">${d.vis}</span></span><span class="${d.sig==='signed'?'success':d.sig?'muted':'faint'}">${d.sig||'—'}</span><span class="muted">${d.date}</span></div>${open?`<div style="padding:10px 18px 14px;background:var(--sunken);font-size:11.5px;display:flex;gap:18px;align-items:center;border-top:1px solid var(--border-sub)"><span class="muted">Versions: <b>v${d.v}</b>${d.supersedes?' ← '+d.supersedes:' (first version)'}</span><div class="spacer"></div><button class="btn sm" onclick="event.stopPropagation();toast('Download (would fetch file_url).')">Download</button><button class="btn sm" onclick="event.stopPropagation();toast('Upload a new version — links to this one via supersedes_id.')">New version</button><button class="btn sm" onclick="event.stopPropagation();toast('Visibility toggled ${d.vis==='client'?'client → internal':'internal → client'} (would prompt to confirm).')">Make ${d.vis==='client'?'internal':'client-visible'}</button>${d.sig&&d.sig!=='signed'?`<button class="btn sm" onclick="event.stopPropagation();toast('Reminder sent to signer via the e-signature provider.')">Remind signer</button>`:''}</div>`:''}`;}).join('');
+  return `<div class="card rounded"><div class="thead" style="grid-template-columns:1.8fr 1fr .8fr .5fr 1fr .7fr .8fr .6fr">Name<span>Client · project</span><span>Kind</span><span>Ver.</span><span>Uploaded by</span><span>Visibility</span><span>Signature</span><span>Date</span></div>${rows||'<div class="empty" style="margin:14px">No documents yet — upload one or wait for the client to upload via the portal.</div>'}<div class="legend">Only the latest version of each chain is listed; click a row for history and actions. Signature status comes from the e-signature provider.</div></div>`;
+}
+function docsVault(r){
+  const kind=r.q.kind||'all', vis=r.q.vis||'all';
+  let list = DB.documents.slice(); if(kind!=='all') list=list.filter(d=>d.kind===kind); if(vis!=='all') list=list.filter(d=>d.vis===vis);
+  const q=(o)=>{const m=Object.assign({kind,vis},o);return '#/docs?'+Object.entries(m).filter(([a,b])=>b!=='all').map(([a,b])=>a+'='+b).join('&');};
+  return `<div class="col"><div class="toolbar"><select class="btn"><option>Client: all</option>${DB.clients.map(c=>`<option>${esc(c.short)}</option>`).join('')}</select><select class="btn"><option>Project: all</option>${DB.projects.map(p=>`<option>${p.code}</option>`).join('')}</select><select class="btn" onchange="go('${q({})}'.replace(/kind=[^&]*&?/,'')+'&kind='+this.value)"><option value="all">Kind: all</option>${Object.entries(KIND).map(([v,l])=>`<option value="${v}"${kind===v?' selected':''}>${l}</option>`).join('')}</select><div class="pills"><span class="pill${vis==='all'?' active':''}" onclick="go('${q({vis:'all'})}')">All</span><span class="pill${vis==='internal'?' active':''}" onclick="go('${q({vis:'internal'})}')">Internal</span><span class="pill${vis==='client'?' active':''}" onclick="go('${q({vis:'client'})}')">Client-visible</span></div><div class="spacer"></div><button class="btn primary" onclick="toast('Upload — pick client, project, kind and visibility.')">Upload</button></div>${docsTable(list)}</div>`;
+}
+
+/* ============ TIME ============ */
+function timeScreen(r){
+  const view=r.q.view||'week';
+  const pills=[['week','My week'],['team','Team'],['project','By project']].map(([v,l])=>`<span class="pill${view===v?' active':''}" onclick="go('#/time?view=${v}')">${l}</span>`).join('');
+  const toolbar=`<div class="toolbar"><div class="pills">${pills}</div><span class="muted" style="font-size:12px">Week of 31 Aug – 4 Sep</span><div class="spacer"></div><button class="btn${S.timerOn?'':' primary'}" onclick="S.timerOn=!S.timerOn;render();toast(S.timerOn?'Timer running on PRJ-0141 · DCF model. Persists across reloads.':'Timer stopped — 0.4h added to today.')">${S.timerOn?'■ Stop timer · 00:24':'▶ Start timer'}</button></div>`;
+  let body='';
+  if(view==='week'){
+    const rows=DB.time.rows.map((row,ri)=>`<div class="trow" style="grid-template-columns:2fr repeat(5,.6fr) .6fr;padding:6px 18px"><span style="${row.go?'cursor:pointer':''}" onclick="${row.go?`go('${row.go}')`:''}">${esc(row.label)}${row.billable?'':' <span class="faint">(non-billable)</span>'}</span>${row.h.map((h,di)=>`<input class="cell" value="${h==null?'—':h}" onfocus="if(this.value==='—')this.value=''" onchange="setHours(${ri},${di},this.value)">`).join('')}<b style="text-align:center">${row.h.reduce((s,h)=>s+(h||0),0).toFixed(1)}</b></div>`).join('');
+    const tots=[0,1,2,3,4].map(d=>DB.time.rows.reduce((s,r)=>s+(r.h[d]||0),0));
+    body=`<div class="card rounded"><div class="thead" style="grid-template-columns:2fr repeat(5,.6fr) .6fr">Project / task<span style="text-align:center">M</span><span style="text-align:center">T</span><span style="text-align:center">W</span><span style="text-align:center">T</span><span style="text-align:center">F</span><span style="text-align:center">Tot</span></div>${rows}<div class="trow tot" style="grid-template-columns:2fr repeat(5,.6fr) .6fr"><span>Total</span>${tots.map(t=>`<span style="text-align:center">${t.toFixed(1)}</span>`).join('')}<span style="text-align:center">${tots.reduce((a,b)=>a+b,0).toFixed(1)}</span></div><div class="legend">Cells are editable — type decimal hours. Rows are project + task pairs; add a row from + New → Time entry.</div></div>
+      <div class="card pad" style="display:flex;flex-direction:column;gap:10px"><div class="h14">Billable vs fee (recovery)</div>${DB.time.recovery.map(x=>`<div class="util"><span class="n" style="cursor:pointer" onclick="go('#/project/${x.p}')">${x.p}</span><div class="tr"><div class="fl" style="width:${Math.min(x.pct,100)}%;${x.pct>=100?'background:var(--danger)':''}"></div></div><span class="p${x.pct>=100?' danger':''}">${x.pct}%</span></div>`).join('')}<div class="hint">Over 100% means logged time has exceeded the fixed fee.</div></div>`;
+  } else if(view==='team'){
+    body=`<div class="card pad" style="display:flex;flex-direction:column;gap:13px"><div style="display:flex;align-items:baseline;gap:10px"><div class="h14">Team utilisation</div><span class="sub11">this week · capacity 40h each · ≥90% flagged</span></div>${DB.time.util.map(u=>`<div class="util"><span class="n">${USERS[u.u].first}</span><div class="tr"><div class="fl" style="width:${Math.min(u.pct,100)}%;${u.pct>=90?'background:var(--danger)':''}"></div></div><span class="p${u.pct>=90?' danger':''}">${u.pct}%</span><span class="muted" style="width:120px;font-size:11px">${(u.pct*0.4).toFixed(1)}h of 40h${u.pct>=90?' · <span class="danger">reassign</span>':''}</span></div>`).join('')}</div>
+      <div class="card rounded"><div class="card-h"><div class="t">Maria's load</div><span class="s">candidates to reassign</span></div><div class="thead" style="grid-template-columns:1fr 1.4fr .5fr .6fr 1fr">Project<span>Task</span><span>Est.</span><span>Due</span><span></span></div>${[['PRJ-0136','Draft §4 Operations',6,'8 Sep'],['PRJ-0141','Draft §3 Market',4,'Today'],['PRJ-0142','Capex quotes follow-up',1,'5 Sep']].map(t=>`<div class="trow" style="grid-template-columns:1fr 1.4fr .5fr .6fr 1fr"><span style="cursor:pointer" onclick="go('#/project/${t[0]}')">${t[0]}</span><span>${t[1]}</span><span class="muted">${t[2]}h</span><span class="muted">${t[3]}</span><span><button class="btn sm" onclick="toast('Reassigned to Andreas (54%). Notified both.')">Reassign → Andreas</button></span></div>`).join('')}</div>`;
+  } else {
+    body=`<div class="card rounded"><div class="thead" style="grid-template-columns:.8fr 1.2fr .6fr .6fr .7fr 1.4fr">Project<span>Client</span><span>Fee</span><span>Hours</span><span>WIP</span><span>Recovery</span></div>${active().filter(p=>p.time>0).map(p=>{const pct=Math.round(p.wip/p.fee*100);return `<div class="trow click" style="grid-template-columns:.8fr 1.2fr .6fr .6fr .7fr 1.4fr" onclick="go('#/project/${p.code}?tab=time')"><span>${p.code}</span><span>${esc(p.clientName)}</span><span class="muted">${k(p.fee)}</span><span class="muted">${p.time}h</span><span class="muted">${money(p.wip)}</span><span class="util"><div class="tr"><div class="fl" style="width:${Math.min(pct,100)}%;${pct>=100?'background:var(--danger)':''}"></div></div><span class="p${pct>=100?' danger':''}">${pct}%</span></span></div>`;}).join('')}</div>`;
+  }
+  return `<div class="col">${toolbar}${body}</div>`;
+}
+function setHours(ri,di,v){const n=parseFloat(v);DB.time.rows[ri].h[di]=isNaN(n)?null:n;render();}
+
+/* ============ INVOICES ============ */
+const ITYPE={deposit:'Deposit €500',inv1:'Invoice 1 — on signing',inv2:'Invoice 2 — final report',ad_hoc:'Ad hoc'};
+function invAction(i){
+  const inv=DB.invoices.find(x=>x.num===i);
+  if(inv.status==='draft'){inv.status='sent';inv.issued='Today';inv.due='+15 days';if(inv.num.endsWith('—'))inv.num=inv.num.replace('—',engNextInvNo(inv.entity));toast(`<b>${inv.num}</b> issued — PDF generated in the Consortia layout and emailed.`,'ok');}
+  else if(inv.status==='sent'||inv.status==='overdue'||inv.status==='part_paid'){inv.status='paid';inv.paid='✓';inv.daysOver=0;const p=proj(inv.project);log('success',`${ITYPE[inv.type]} <b>${money(inv.amount,inv.currency)}</b> received`,`${esc(inv.client)} · just now`,'#/invoices');toast(`Payment recorded on <b>${inv.num}</b>.${inv.type==='inv2'&&p?` ${p.code} can now be closed.`:''}`,'ok');}
+  render();
+}
+function invoicesTable(list){
+  const rows=list.map(i=>`<div class="trow${i.status==='overdue'?' attn':''}" style="grid-template-columns:.7fr 1.1fr .7fr .8fr .7fr .5fr .6fr .6fr .7fr 1.1fr"><span>${i.num}</span><span>${esc(i.client)}</span><span class="muted" style="cursor:pointer" onclick="go('#/project/${i.project}')">${i.project}</span><span class="muted">${ITYPE[i.type]}</span><span>${money(i.amount,i.currency)}</span><span class="muted">${i.entity==='UK'?'LLP':'CY'} · no VAT</span><span class="muted">${i.issued}</span><span class="muted">${i.due}</span><span class="${i.status==='overdue'?'danger w500':i.status==='paid'?'success':'muted'}">${i.status.replace('_',' ')}${i.daysOver?` · ${i.daysOver}d`:''}</span><span style="display:flex;gap:5px">${i.status==='draft'?`<button class="btn sm" onclick="invAction('${i.num}')">Issue</button>`:i.status==='paid'?`<button class="btn sm" onclick="toast('PDF (would download).')">PDF</button>`:`<button class="btn sm" onclick="invAction('${i.num}')">Record payment</button><button class="btn sm" onclick="toast('Reminder sent.')">Remind</button>`}</span></div>`).join('');
+  return `<div class="card rounded"><div class="thead" style="grid-template-columns:.7fr 1.1fr .7fr .8fr .7fr .5fr .6fr .6fr .7fr 1.1fr">Number<span>Client</span><span>Project</span><span>Type</span><span>Amount</span><span>Issuer</span><span>Issued</span><span>Due</span><span>Status</span><span>Actions</span></div>${rows||'<div class="empty" style="margin:14px">No invoices match.</div>'}<div class="legend">Deposit and Invoice 1 are raised during the engagement (see Engagements). Invoice 2 is generated automatically when the project reaches Final report. Issuer follows the country rule: UK client → Consortia Ltd, everyone else → Consortia Advisory LLP. No VAT on any invoice.</div></div>`;
+}
+function invoicesScreen(r){
+  const st=r.q.status||'all';
+  let list=DB.invoices.slice(); if(S.entity!=='BOTH') list=list.filter(i=>i.entity===S.entity); if(st!=='all') list=list.filter(i=>i.status===st);
+  const pills=[['all','All'],['draft','Draft'],['sent','Sent'],['part_paid','Part paid'],['paid','Paid'],['overdue','Overdue']].map(([v,l])=>`<span class="pill${st===v?' active':''}" onclick="go('#/invoices?status=${v}')">${l}</span>`).join('');
+  const od=list.filter(i=>i.status==='overdue'); const sum=s=>list.filter(i=>i.status===s).reduce((a,i)=>a+i.amount,0);
+  const strip=`<div class="kpis" style="grid-template-columns:repeat(4,1fr)"><div class="kpi" style="cursor:default"><div class="l">Outstanding</div><div class="v">${money(sum('sent')+sum('overdue'))}</div><div class="d muted">${list.filter(i=>['sent','overdue'].includes(i.status)).length} invoices issued</div></div><div class="kpi${od.length?' attn':''}" onclick="go('#/invoices?status=overdue')"><div class="l">Overdue</div><div class="v">${money(od.reduce((a,i)=>a+i.amount,0))}</div><div class="d ${od.length?'danger':'success'}">${od.length?od.length+' invoices':'none'}</div></div><div class="kpi" style="cursor:default"><div class="l">Paid this quarter</div><div class="v">${money(sum('paid'))}</div><div class="d success">${list.filter(i=>i.status==='paid').length} invoices</div></div><div class="kpi" style="cursor:default"><div class="l">Scheduled (draft)</div><div class="v">${money(sum('draft'))}</div><div class="d muted">issues on stage change</div></div></div>`;
+  return `<div class="col">${strip}<div class="toolbar"><div class="pills">${pills}</div><span class="chip" style="padding:5px 10px;font-size:11px">Entity: ${S.entity==='BOTH'?'both':ENTITY[S.entity]} — change in the top bar</span><div class="spacer"></div><button class="btn" onclick="toast('Export → XLSX for the bookkeeper.')">Export</button><button class="btn primary" onclick="openCreate('invoice')">+ Ad hoc invoice</button></div>${invoicesTable(list)}</div>`;
+}
+
+/* ============ REPORTS ============ */
+function reportsScreen(r){
+  const bar=(l,h,c)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;justify-content:flex-end;height:100%"><div style="width:100%;height:${h}px;background:${c};border-radius:5px 5px 0 0"></div><span class="l" style="font-size:10px;color:var(--muted)">${l}</span></div>`;
+  const hbar=(l,p)=>`<div class="util"><span class="n" style="width:80px">${l}</span><div class="tr"><div class="fl" style="width:${p}%;${p>=60?'background:var(--brand)':''}"></div></div><span class="p">${p}%</span></div>`;
+  const strip=`<div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi" style="cursor:default"><div class="l">Booked this month</div><div class="v">€74k</div><div class="d success">+12% vs prior month</div></div><div class="kpi" style="cursor:default"><div class="l">WIP</div><div class="v">€31k</div><div class="d muted">84h unbilled</div></div><div class="kpi attn" onclick="go('#/invoices?status=overdue')"><div class="l">Overdue</div><div class="v">€9k</div><div class="d danger">across 2 invoices</div></div></div>`;
+  return `<div class="col"><div class="toolbar"><select class="btn"><option>FY26 YTD</option><option>Last quarter</option><option>Last month</option><option>Custom range</option></select><select class="btn"><option>Both entities</option><option>${ENTITY.CY}</option><option>${ENTITY.UK}</option></select><div class="spacer"></div><button class="btn" onclick="toast('Export → PDF / XLSX.')">Export</button></div>${strip}
+    <div class="two">
+      <div class="card pad" style="display:flex;flex-direction:column;gap:14px"><div><div class="h14">Revenue by service line</div><div class="sub11">FY26 YTD · booked fees</div></div><div class="bar-h">${bar('Valuation · €212k',110,'var(--brand)')}${bar('Business plan · €96k',58,'var(--accent)')}${bar('Feasibility · €118k',70,'var(--inactive)')}${bar('Fractional CFO · €24k',18,'var(--inactive)')}</div></div>
+      <div class="card pad" style="display:flex;flex-direction:column;gap:12px"><div><div class="h14">Lead source → won</div><div class="sub11">from GoHighLevel history · conversion to engagement</div></div>${hbar('Google Ads',70)}${hbar('Referral',52)}${hbar('LinkedIn',33)}${hbar('Website',22)}</div>
+      <div class="card pad"><div class="h14" style="margin-bottom:8px">Avg. days per stage</div><div class="kv"><span class="k">NDA → Eng. letter</span><b>6.2</b></div><div class="kv"><span class="k">Eng. letter → deposit</span><b>4.8</b></div><div class="kv"><span class="k">Deposit → data complete</span><b class="danger">17.4</b></div><div class="kv"><span class="k">Draft → delivered</span><b>9.1</b></div><div class="hint" style="margin-top:8px">Data collection is the firm's worst bottleneck — the client portal checklist and automated chasing target this number.</div></div>
+      <div class="card pad"><div class="h14" style="margin-bottom:8px">Saved reports</div>${[['Partner pack — monthly','PDF'],['WIP & unbilled','XLSX'],['Pipeline forecast','PDF'],['Recovery by project','XLSX']].map(x=>`<div class="kv" style="cursor:pointer" onclick="toast('Generating ${x[0]} (${x[1]})…')"><span>${x[0]}</span><span class="chip sm">${x[1]}</span></div>`).join('')}</div>
+    </div></div>`;
+}
+
+/* ============ CLIENT PORTAL ============ */
+function portalUpload(code,i){const p=proj(code);const d=p.data[i];d.status='received';const t=p.tasks.find(t=>t.st!=='done'&&t.t.toLowerCase().startsWith('chase')&&t.t.toLowerCase().includes(d.label.toLowerCase().split(' ')[0]));if(t)t.st='done';const c=client(p.client);const who=c.contacts[0].n;DB.documents.unshift({name:d.label+'.pdf',kind:'other',project:p.code,client:p.clientName,v:1,by:who+' (portal)',vis:'client',date:'Just now'});log('accent',`<b>${esc(who)}</b> uploaded <b>${esc(d.label)}</b>`,`${esc(p.clientName)} · just now`,`#/project/${p.code}`);c.timeline.unshift({t:`<b>${esc(who)}</b> uploaded ${esc(d.label)}`,m:'Just now · portal',auto:true});render();toast(`Upload received. Checklist item → <b>received</b>, internal chase task closed, activity logged. ${outstanding(p)?outstanding(p)+' item(s) still outstanding.':'Data pack complete — Draft can now be completed.'}`,'ok');}
+function portalScreen(r){
+  if(S.portalEng){const e=eng(S.portalEng);if(e&&!e.project){const preview=`<div class="card pad" style="max-width:860px;margin:0 auto 14px;display:flex;align-items:center;gap:12px;background:var(--attn-soft)"><span style="font-size:12px"><b>Internal preview</b> — you're seeing exactly what <b>${esc(e.contactName)}</b> sees (pre-engagement). Switch:</span><select class="btn" onchange="S.portalEng=this.value||null;if(!this.value)S.portalProject=DB.projects[0].code;render()"><option value="">— a live project —</option>${DB.engagements.filter(x=>!x.project&&engStage(x)!=='declined').map(x=>`<option value="${x.id}"${x.id===e.id?' selected':''}>${x.code} · ${esc(x.companyName)}</option>`).join('')}</select><div class="spacer"></div><button class="btn sm" onclick="go('#/engagement/${e.id}')">Open internal view</button></div>`;return preview+engPortal(e);}S.portalEng=null;}
+  const p=proj(S.portalProject)||DB.projects[0]; const c=client(p.client); const contact=c.contacts.find(x=>x.portal)||c.contacts[0];
+  const pstep = p.status==='delivered'?4:p.stage<=3?1:p.stage===4?2:3;
+  const steps=['Information & drafting','Your review','Final report','Closed'].map((s,i)=>{const n=i+1;const cl=n<pstep||(p.status==='delivered')?'done':n===pstep?'cur':'';return `<div class="step ${cl}" style="cursor:default"><div class="bar"></div><div class="lb">${s}${n<pstep||p.status==='delivered'?' ✓':n===pstep?' ●':''}</div></div>`;}).join('');
+  const dep=depositInv(p), fin=finalInv(p);
+  const nda=DB.documents.find(d=>d.project===p.code&&d.kind==='nda'), el=DB.documents.find(d=>d.project===p.code&&d.kind==='eng_letter');
+  const received=p.data.filter(d=>d.status!=='requested').length+(nda?1:0)+(el?1:0), total=p.data.length+2;
+  const need=p.data.map((d,i)=>({d,i})).filter(x=>x.d.status==='requested');
+  const rows=need.map(({d,i},n)=>`<div class="pr"><div style="flex:1"><div>${esc(d.label)}</div><div class="m">Requested 21 Jul${d.reminders?` · reminder sent${d.reminders>1?' ×'+d.reminders:''}`:''}</div></div><button class="btn sm${n===0?' primary':''}" onclick="portalUpload('${p.code}',${i})">Upload</button></div>`).join('');
+  const done=[...p.data.filter(d=>d.status!=='requested').map(d=>d.label),nda?'NDA':null,el?'Engagement letter':null].filter(Boolean);
+  const preview=`<div class="card pad" style="max-width:860px;margin:0 auto 14px;display:flex;align-items:center;gap:12px;background:var(--attn-soft)"><span style="font-size:12px"><b>Internal preview</b> — you're seeing exactly what <b>${esc(contact.n)}</b> sees. Switch engagement:</span><select class="btn" onchange="if(this.value.startsWith('ENG')){S.portalEng=this.value;}else{S.portalProject=this.value;}render()">${DB.engagements.filter(x=>!x.project&&engStage(x)!=='declined').map(x=>`<option value="${x.id}">${x.code} · ${esc(x.companyName)} (pre-engagement)</option>`).join('')}${DB.projects.filter(x=>x.status==='active').map(x=>`<option value="${x.code}"${x.code===p.code?' selected':''}>${x.code} · ${esc(x.clientName)}</option>`).join('')}</select><div class="spacer"></div><button class="btn sm" onclick="go('#/project/${p.code}')">Open internal view</button></div>`;
+  const thread=p.thread.filter(m=>!m.internal);
+  return `${preview}<div class="portal"><div class="pbar"><span class="wm">CONSORTIA</span><div class="spacer"></div><span style="font-size:12px;opacity:.85">${esc(c.name)} · ${esc(contact.n)}</span><div class="avatar" style="width:26px;height:26px">${contact.n.split(' ').map(w=>w[0]).join('')}</div></div>
+    <div class="pbody">
+      <div><div style="font:600 16px Newsreader,serif">${esc(p.title)}</div><div class="sub11">Engagement ${p.code} · target delivery ${p.due}</div></div>
+      <div class="stepper" style="gap:6px">${steps}</div>
+      ${p.status==='delivered'?`<div class="pcard"><div class="ph" style="background:var(--attn)"><b>Your final report is ready</b></div><div class="pr"><div style="flex:1">${esc(p.title)} — final</div><button class="btn sm primary">Download</button></div></div>`:''}
+      <div class="pcard"><div class="ph${need.length?' attn':''}"><b>${need.length?`${need.length} item${need.length>1?'s':''} we still need from you`:'Nothing outstanding — thank you'}</b><div class="spacer"></div><span style="font-size:11px;color:var(--text-3)">${received} of ${total} received</span></div>${rows}<div class="pr" style="color:var(--muted)"><div style="flex:1;font-size:11.5px">${done.join(' · ')||'—'}</div><span class="success" style="font-size:11px">received ✓</span></div></div>
+      <div class="two">
+        <div class="pcard"><div class="ph"><b>Documents & signatures</b></div><div class="pr"><span style="flex:1">NDA</span><span class="${nda&&nda.sig==='signed'?'success':'muted'}">${nda?nda.sig==='signed'?'signed 22 Jul':`<button class="btn sm primary">Sign</button>`:'—'}</span></div><div class="pr"><span style="flex:1">Engagement letter</span><span class="${el&&el.sig==='signed'?'success':'muted'}">${el?el.sig==='signed'?'signed 24 Jul':`<button class="btn sm primary">Sign</button>`:'—'}</span></div><div class="pr"><span style="flex:1">Draft report ${p.version.split(' ')[0]}</span><span class="muted">${p.stage>=4?`<button class="btn sm primary" onclick="toast('Opens the draft for review; approve or comment in-portal.')">Review & approve</button>`:'not yet shared'}</span></div></div>
+        <div class="pcard"><div class="ph"><b>Invoices</b></div><div class="pr"><span style="flex:1">${dep.num} · Invoice 1 (on signing)</span><span class="${dep.status==='paid'?'':dep.status==='overdue'?'danger':'muted'}">${money(dep.amount,dep.currency)} ${dep.status==='paid'?'paid':dep.status==='overdue'?'overdue':dep.status==='sent'?`<button class="btn sm primary" onclick="toast('Bank transfer to the account printed on the invoice — no card payment for engagement invoices.')">Pay</button>`:'not yet issued'}</span></div><div class="pr"><span style="flex:1">Invoice 2 (final report)</span><span class="muted">${fin.status==='paid'?'paid':fin.status==='sent'?`${money(fin.amount,fin.currency)} due`:'on completion'}</span></div></div>
+      </div>
+      <div class="pcard"><div class="ph"><b>Message your team</b></div><div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--border-sub)">${thread.length?thread.map(m=>`<div class="msg${m.client?' me':''}"><div class="bub">${esc(m.body)}</div><div class="mt">${esc(m.who)} · ${m.at}</div></div>`).join(''):'<div class="ghost" style="font-size:11.5px">Questions? Write to your engagement team here — they reply within one working day.</div>'}<div style="display:flex;gap:8px"><input class="ta" style="min-height:0;height:34px" placeholder="Write a message…"><button class="btn sm primary" onclick="toast('Sent to the engagement team.')">Send</button></div></div></div>
+    </div></div>`;
+}
+
+/* ============ CREATE MODAL ============ */
+function openCreate(kind,ctx){
+  S.menu=null; render();
+  const f=(l,inner)=>`<label class="field">${l}${inner}</label>`;
+  const clientOpts=DB.clients.map(c=>`<option value="${c.id}"${ctx===c.id?' selected':''}>${esc(c.name)}</option>`).join('');
+  const projOpts=active().map(p=>`<option value="${p.code}"${ctx===p.code?' selected':''}>${p.code} · ${esc(p.clientName)}</option>`).join('');
+  const forms={
+    lead:['New lead',f('Company',`<input id="f1" placeholder="Company name">`)+f('Service line',`<select id="f2"><option value="valuation">Valuation</option><option value="business_plan">Business plan</option><option value="feasibility">Feasibility</option></select>`)+f('Estimated fee (€)',`<input id="f3" type="number" placeholder="15000">`)+f('Source',`<select id="f4"><option>Referral</option><option>Google Ads</option><option>LinkedIn</option><option>Website</option><option>Direct</option></select>`)],
+    client:['New client',f('Legal name',`<input id="f1" placeholder="Company Ltd">`)+f('Country',`<select id="f2"><option>Cyprus</option><option>United Kingdom</option><option>Greece</option></select>`)+f('Contracting entity',`<select id="f3"><option value="CY">${ENTITY.CY}</option><option value="UK">${ENTITY.UK}</option></select>`)],
+    project:['New project',f('Client',`<select id="f1">${clientOpts}</select>`)+f('Service line (picks the stage template)',`<select id="f2"><option value="valuation">Valuation</option><option value="business_plan">Business plan</option><option value="feasibility">Feasibility</option></select>`)+f('Title',`<input id="f3" placeholder="Business Valuation FY26">`)+f('Fee total (€, no VAT)',`<input id="f4" type="number" placeholder="20000">`)+`<div class="hint">Creating the project instantiates 8 stages, template tasks, the data checklist and both scheduled invoices.</div>`],
+    invoice:['New ad hoc invoice',f('Project',`<select id="f1">${projOpts}</select>`)+f('Amount (excl. VAT)',`<input id="f2" type="number" placeholder="2500">`)+f('Description',`<input id="f3" placeholder="Additional site visit">`)],
+    time:['Log time',f('Project',`<select id="f1">${projOpts}</select>`)+f('Task',`<input id="f2" placeholder="DCF model">`)+f('Hours',`<input id="f3" type="number" step="0.25" placeholder="1.5">`)+f('Billable',`<select id="f4"><option>Yes</option><option>No</option></select>`)],
+  };
+  const [title,fields]=forms[kind];
+  $('overlay').innerHTML=`<div class="modal" onclick="event.stopPropagation()"><h3>${title}</h3>${fields}<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="submitCreate('${kind}')">Create</button></div></div>`;
+  $('overlay').className='overlay open'; $('overlay').onclick=closeModal;
+  const first=$('overlay').querySelector('input,select'); if(first) first.focus();
+}
+function closeModal(){$('overlay').className='overlay';$('overlay').innerHTML='';}
+function submitCreate(kind){
+  const v=i=>{const el=$('f'+i);return el?el.value:'';};
+  if(kind==='lead'){DB.leads.unshift({id:'LN'+Date.now(),company:v(1)||'New lead',service:v(2),fee:+v(3)||0,stage:'call1',src:v(4),p:25});closeModal();go('#/leads');toast('Lead created in Qualifying.','ok');}
+  else if(kind==='client'){const c={id:'CLI-0'+(95+DB.clients.length),name:v(1)||'New client',short:(v(1)||'New client').replace(/ Ltd$/,''),reg:'—',country:v(2),industry:'—',currency:v(3)==='UK'?'GBP':'EUR',entity:v(3),owner:S.role,source:'Direct',lifecycle:'lead',interest:'—',contacts:[],timeline:[]};DB.clients.push(c);closeModal();go('#/client/'+c.id);toast('Client record created.','ok');}
+  else if(kind==='project'){const c=client(v(1));const svc=v(2);const code='PRJ-0'+(DB.nextProject++);const fee=+v(4)||20000;const p={code,client:c.id,clientName:c.short,title:v(3)||SERVICE[svc]+' engagement',service:svc,stage:1,owner:S.role,reviewer:'AP',fee,due:'TBC',entity:c.entity,status:'active',risk:'ok',time:0,wip:0,version:'v0.1',thread:[],comments:[],start:'Today',data:CHECKLIST[svc].slice(0,4).map(label=>({label,required:true,status:'requested',reminders:0})),sections:SECTIONS[svc].map(title=>({title,state:'todo'})),tasks:[{t:'Send NDA',a:'KM',est:.5,st:'todo'},{t:'Issue engagement letter',a:'KM',est:1,st:'todo'},{t:'Issue deposit invoice',a:'EK',est:.5,st:'todo'},{t:'Request client data pack',a:'MA',est:1,st:'todo'},{t:'Kick-off call',a:S.role,est:1,st:'todo'}]};DB.projects.unshift(p);const pre=c.entity==='UK'?'UKI-':'INV-';const cur=c.entity==='UK'?'GBP':'EUR';DB.invoices.push({num:pre+(DB.nextInv++),project:code,client:c.short,entity:c.entity,type:'deposit_50',amount:fee/2,vat:0,currency:cur,status:'draft',issued:'—',due:'—'});DB.invoices.push({num:pre+(DB.nextInv++),project:code,client:c.short,entity:c.entity,type:'final_50',amount:fee/2,vat:0,currency:cur,status:'draft',issued:'—',due:'—'});log('inactive',`${USERS[S.role].first} created <b>${code}</b>`,`${esc(c.short)} · just now`,`#/project/${code}`);closeModal();go('#/project/'+code);toast(`<b>${code}</b> created from the ${SERVICE[svc]} template — 8 stages, ${p.tasks.length} tasks, ${p.data.length} data requests, 2 scheduled invoices.`,'ok');}
+  else if(kind==='invoice'){const p=proj(v(1));const pre=p.entity==='UK'?'UKI-':'INV-';DB.invoices.push({num:pre+(DB.nextInv++),project:p.code,client:p.clientName,entity:p.entity,type:'ad_hoc',amount:+v(2)||0,vat:0,currency:'EUR',status:'draft',issued:'—',due:'—'});closeModal();go('#/invoices?status=draft');toast('Ad hoc invoice drafted.','ok');}
+  else if(kind==='time'){const p=proj(v(1));const h=+v(3)||0;p.time+=h;p.wip+=Math.round(h*95);DB.time.rows.unshift({label:`${p.code} · ${v(2)||'Task'}`,go:'#/project/'+p.code,h:[null,null,h,null,null],billable:v(4)==='Yes'});closeModal();toast(`${h}h logged to <b>${p.code}</b>.`,'ok');render();}
+}
+
+/* ============ SPEC NOTES (feature requirements per screen) ============ */
+function specNotes(r){
+  const N={
+    dashboard:['Dashboard',['One aggregate endpoint returns KPIs, my tasks, stage counts, utilisation, activity and decisions — no fan-out of five calls.','Every KPI tile, chart bar and task row is a filtered navigation (try them).','Role-aware: analysts get only their tasks, own utilisation and activity — click the user block bottom-left to switch.','Activity feed is read from the append-only activity_log; polling or subscription.','"Needs a partner decision" items are generated from rules (overdue deposit, scope change, capacity ≥90%) and link to the record.'],['Which rules should generate partner-decision items, and who else sees them?']],
+    leads:['Leads',['GoHighLevel webhook → ghl_import (raw payload) → Triage view → lead/client. One-way only, never write back.','Kanban with drag-and-drop plus a one-click → advance; List and Forecast are the same data as a sortable, exportable table.','Moving a lead to Call 1 booked → the → button opens an engagement. Won happens inside the engagement (letter signed, Invoice 1 paid), never from the board.','Weighted pipeline, win rate and cycle time are server-computed.','A lead is a client record in an early lifecycle stage — no separate lead object screen.'],['GHL cutover: backfill historic opportunities, or only new leads from go-live? (open question #6)']],
+    clients:['Clients',['One record per organisation across pre-sale and delivery; lifecycle = lead / active / dormant.','Row shows the current lead stage when an open lead exists.','Compliance tab was not designed — the fields shown are placeholders.']],
+    client:['Client record',['Header: stage chip when an open lead exists, "Convert to engagement" runs the same won-lead transaction.','Timeline mixes automated events (imports, uploads, payments, stage changes) with manual notes and emails.','Compose: Email / Note / ✦ AI draft — AI output always needs a human to send.','Contacts carry primary, billing and portal-access flags; portal users are scoped to this client only.','Documents, Invoices and Projects tabs are filtered views of the firm-wide entities.'],['AI drafting scope: which emails and sections may be AI-drafted, and what review is mandatory? (open question #5)']],
+    projects:['Projects list',['Eight stage pips per row: burgundy done · blue current · rust current-but-blocked · track future.','Blocked rows (deposit unpaid) get the amber fill and a rust due value.','Filters: All live / Mine / At risk / Delivered, plus stage (from the dashboard chart), service line and entity — all URL parameters so they are deep-linkable.']],
+    project:['Project detail',['Stage stepper from project_stage rows; every "Advance stage →" is validated server-side against the gate rule and the reason renders in the strip. Try advancing PRJ-0141 (2 docs outstanding) or PRJ-0138 (deposit unpaid).','Gate rules: deposit unpaid blocks Draft start · required data outstanding blocks Draft completion · unresolved comments block Client review · final invoice unpaid or unsigned blocks Delivered.','Task board with drag-and-drop; tasks carry provenance (template / manual / comment / AI) and estimate vs logged.','Data checklist: reminders auto-increment ("chased ×N"); a portal upload flips the item to received and closes the chase task.','Deliverable tab (2d direction): sections left, document centre, comments right; a comment can become a task.','Time & fees shows recovery — logged cost against the fixed fee.','Client thread: shared with the portal except messages flagged internal.','History: append-only log for compliance and handover.'],['Final report sign-off: reuse the click-to-sign block from the engagement letter?']],
+    docs:['Documents',['Firm-wide vault over the document entity; filter by client, project, kind, visibility.','Version chains via supersedes_id — only the latest is listed, history one click away.','Visibility (internal / client) is the key control: the same vault holds working papers and client deliverables.','Signature status inline from signature_request.']],
+    time:['Time',['Weekly grid is inline-editable; totals recompute. Timer state persists across reloads.','Team view flags ≥90% utilisation and suggests reassignment.','Recovery = billable time at cost/charge rate vs fixed fee; >100% is rendered rust and clamped at full width.'],['Cost rate vs charge rate: which drives WIP and recovery?']],
+    engagements:['Engagements',['Pre-sale object between a GHL opportunity and a project. Stage machine: deposit_pending → nda_pending → docs_pending → review_pending → proposal → engaged → valuation_active; declined from anywhere before engaged.','Every arrow is a gate in advance_engagement() in Postgres — the UI only asks.','Deposit: €500 invoice with Stripe link at Call 1, webhook flips it; refunded on decline, credited to Invoice 1 on signing.','NDA + engagement letter generated from locked docx templates (docxtemplater) — only the merge fields change. Four approach toggles; both market methods collapse to the single master line.','Click-to-sign on the portal: typed name + checkbox + timestamp + IP + document hash → audit page on the countersigned PDF. No third-party e-sign.','Invoice maths: invoice_schedule(fee) — 50% capped at €5,000 less the €500 deposit on signing; balance on final report. No VAT.','Issuing entity per invoice by country rule (UK client → Consortia Ltd, else Consortia Advisory LLP); bank account by entity + currency; one number sequence per entity.','Start valuation = create the project from the Valuation template, gated on Invoice 1 paid.'],['LLP partnership number for the invoice footer','One Stripe account per entity, or shared?']],
+    engagement:['Engagement',['See Engagements. This screen is the six-step workspace: Call 1 deposit · NDA · Financials · Call 2 · Engagement letter · Invoice & start.','Right column reads from agreements, deposits and activity_log.'],[]],
+    invoices:['Invoices',['Scoped by the top-bar entity switcher (invoicing entity, not the client). No VAT on any invoice; currency EUR (GBP optional for the LLP). Number sequence per entity: CY continues from #6, LLP from #1.','Deposit and Invoice 1 are created by the engagement; Invoice 2 is generated when the project reaches Final report. PDF is produced by the platform in the Consortia layout (invoice.mjs) with the entity\'s bank block.','Recording a payment clears the deposit gate — try "Record payment" on LLP #4 and then open PRJ-0138.','Overdue rows: amber fill, rust status text. Actions: issue, send, record payment, download PDF.'],['Stripe for the deposit only; engagement invoices by bank transfer — payments recorded manually from the bank statement until an open-banking feed is worth it.']],
+    reports:['Reports',['Period and entity pickers; reports can show both entities while other financial screens are scoped to one.','Revenue by service line, lead source conversion (from GHL history), avg. days per stage (data collection is the bottleneck), saved report definitions.','Partner-briefing figures (booked, WIP, overdue) should be the same numbers the dashboard uses.']],
+    portal:['Client portal',['Separate auth (portal_user); sees only this client\'s records with visibility = client. Never internal stage names, task detail or staff beyond the engagement team.','The 8 internal stages collapse to 5 plain-language steps.','Upload attaches to the matching data_request, flips it to received, closes the internal chase task and logs activity — try "Upload" on an outstanding item, then check the project.','Signatures and invoices are surfaced with the actions the client can take.','Alternative (2j): a thread-first portal where requests appear as action cards — keep as a variant for owner-managed clients.'],['Payments in-portal or by bank transfer? (open question #3)','E-signature provider (open question #2)']],
+  };
+  const n=N[r.route]||N.dashboard;
+  const global=['Permissions matrix for the six internal roles has not been designed — ask before inventing one (open question #1).','Desktop-only, ~1280px minimum. No shadows, no white, one attention colour.'];
+  return `<button class="btn sm x" onclick="S.spec=false;render()">✕</button><h3>${n[0]}</h3><div class="faint" style="font-size:11px">Feature notes from the design handover, plus what this prototype simulates.</div><h4>What this screen requires</h4><ul>${n[1].map(x=>`<li>${x}</li>`).join('')}</ul>${n[2]?`<h4>Open questions</h4><ul>${n[2].map(x=>`<li>${x}</li>`).join('')}</ul>`:''}<h4>Across the product</h4><ul>${global.map(x=>`<li>${x}</li>`).join('')}</ul><h4>Prototype</h4><ul><li>Everything is in-memory sample data — reload the page to reset.</li><li>Gate rules and automations are simulated in the browser; in the real product they run on the server.</li></ul>`;
+}
+
+render();
+</script>
+</body>
+</html>
