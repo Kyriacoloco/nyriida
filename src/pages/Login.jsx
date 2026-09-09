@@ -18,7 +18,7 @@ export default function Login() {
   return (
     <div className="login">
       <form className="box" onSubmit={send}>
-        <h1>Consortia OS</h1>
+        <h1>Solonos</h1>
         {sent ? (
           <p>Check {email} for a sign-in link. It opens this app already signed in.</p>
         ) : (
