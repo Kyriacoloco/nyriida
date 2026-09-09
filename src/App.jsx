@@ -25,7 +25,7 @@ function Shell({ session, staff, signOut }) {
   return (
     <div className="shell">
       <nav className="sidebar">
-        <div className="wordmark">Consortia OS</div>
+        <div className="wordmark">Solonos</div>
         {NAV.map(([label, to, slice]) => (
           <NavLink key={to} to={to} className={({ isActive }) => (isActive ? "active" : "")}>
             {label}{slice && <span className="soon">slice {slice}</span>}
