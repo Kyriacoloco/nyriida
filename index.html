@@ -276,30 +276,46 @@ function Card({ title, right, children, style }) {
 // ===================== pages/Login.jsx =====================
 function Login() {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState("password");   // password | link
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function send(e) {
+  async function submit(e) {
     e.preventDefault();
     setBusy(true); setErr("");
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin + "/app/leads" } });
-    setBusy(false);
-    if (error) setErr(error.message); else setSent(true);
+    if (mode === "password") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      setBusy(false);
+      if (error) setErr(error.message === "Invalid login credentials" ? "Wrong email or password." : error.message);
+    } else {
+      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin + "/" } });
+      setBusy(false);
+      if (error) setErr(error.message); else setSent(true);
+    }
   }
 
   return (
     <div className="login">
-      <form className="box" onSubmit={send}>
+      <form className="box" onSubmit={submit}>
         <h1>Solonos</h1>
         {sent ? (
-          <p>Check {email} for a sign-in link. It opens this app already signed in.</p>
+          <p>Check {email} for a sign-in link. Once inside, set a password from the bottom of the left menu.</p>
         ) : (
           <>
-            <p>Sign in with your work email. No password: you get a link.</p>
+            <p>{mode === "password" ? "Sign in with your email and password." : "No password yet? Get a one-time link by email."}</p>
             <input type="email" required placeholder="you@consortiaadvisory.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            {mode === "password" && (
+              <input type="password" required placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ marginTop: 8 }} />
+            )}
             {err && <p className="err">{err}</p>}
-            <button className="btn primary" disabled={busy}>{busy ? "Sending…" : "Send sign-in link"}</button>
+            <button className="btn primary" disabled={busy}>{busy ? "Working…" : mode === "password" ? "Sign in" : "Email me a link"}</button>
+            <p style={{ marginTop: 14, fontSize: 13 }}>
+              {mode === "password"
+                ? <a href="#" style={{ color: "var(--on)", opacity: .85 }} onClick={(e) => { e.preventDefault(); setMode("link"); setErr(""); }}>No password yet or forgot it? Email me a link</a>
+                : <a href="#" style={{ color: "var(--on)", opacity: .85 }} onClick={(e) => { e.preventDefault(); setMode("password"); setErr(""); }}>Back to password sign-in</a>}
+            </p>
           </>
         )}
       </form>
@@ -1006,6 +1022,28 @@ const NAV = [
   ["Portal preview", "/app/portal", 2],
 ];
 
+function SetPassword() {
+  const [open, setOpen] = useState(false);
+  const [pw, setPw] = useState("");
+  const [msg, setMsg] = useState("");
+  async function save() {
+    if (pw.length < 8) { setMsg("At least 8 characters."); return; }
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    setMsg(error ? error.message : "Password saved. Use it next time you sign in.");
+    if (!error) { setPw(""); setTimeout(() => { setOpen(false); setMsg(""); }, 2500); }
+  }
+  if (!open) return <button onClick={() => setOpen(true)} style={{ marginRight: 6 }}>Set password</button>;
+  return (
+    <div style={{ margin: "6px 0" }}>
+      <input type="password" placeholder="New password" value={pw} onChange={(e) => setPw(e.target.value)}
+        style={{ width: "100%", padding: 6, borderRadius: 6, border: "1px solid rgba(255,255,255,.4)", background: "rgba(255,255,255,.1)", color: "var(--on)", fontSize: 12, marginBottom: 6 }} />
+      <button onClick={save} style={{ marginRight: 6 }}>Save</button>
+      <button onClick={() => { setOpen(false); setMsg(""); }}>Cancel</button>
+      {msg && <div style={{ fontSize: 11, marginTop: 6 }}>{msg}</div>}
+    </div>
+  );
+}
+
 function Shell({ session, staff, signOut }) {
   return (
     <div className="shell">
@@ -1019,6 +1057,7 @@ function Shell({ session, staff, signOut }) {
         <div className="foot">
           {staff?.full_name ?? session.user.email}<br />
           <span style={{ opacity: .7 }}>{staff?.role}</span><br />
+          <SetPassword />
           <button onClick={signOut}>Sign out</button>
         </div>
       </nav>
