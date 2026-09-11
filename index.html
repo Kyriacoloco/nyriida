@@ -358,7 +358,7 @@ function Leads() {
 
   if (stages.length === 0) return (
     <>
-      <Head lastSync={lastSync} />
+      <Head lastSync={lastSync} reload={load} />
       <Empty title="No pipeline yet">
         Run the first GHL pull (README step 2) and the stages appear here, in the same order as GHL.
       </Empty>
@@ -367,7 +367,7 @@ function Leads() {
 
   return (
     <>
-      <Head lastSync={lastSync} count={leads.length} />
+      <Head lastSync={lastSync} count={leads.length} reload={load} />
       <div className="board">
         {stages.map((st) => {
           const rows = leads.filter((l) => l.stage_id === st.ghl_id);
@@ -412,13 +412,27 @@ function Intake({ custom, title = "Intake form" }) {
   );
 }
 
-function Head({ lastSync, count }) {
+function Head({ lastSync, count, reload }) {
+  const [run, busy] = useAction();
+  const toast = useToast();
+  async function sync() {
+    await run(async () => {
+      const { data, error } = await supabase.functions.invoke("ghl-sync?mode=full", { body: {} });
+      if (error) throw new Error((await error.context?.json?.().catch(() => null))?.error ?? error.message);
+      if (data?.ok === false) throw new Error(data.error);
+      toast(`Synced ${data?.opportunities ?? 0} leads from "${data?.pipeline ?? "GHL"}"`);
+      await reload?.();
+    });
+  }
   return (
     <div className="pagehead">
       <div><h1>Leads</h1><p>Your GHL pipeline, mirrored. Move leads in GHL; they move here within seconds.</p></div>
-      <div className="muted small">
-        {count != null && `${count} open · `}
-        {lastSync ? `last sync ${ago(lastSync.received_at)}` : "never synced"}
+      <div className="row">
+        <span className="muted small">
+          {count != null && `${count} open · `}
+          {lastSync ? `last sync ${ago(lastSync.received_at)}` : "never synced"}
+        </span>
+        <button className="btn" disabled={busy} onClick={sync}>{busy ? "Syncing…" : "Sync from GHL"}</button>
       </div>
     </div>
   );
