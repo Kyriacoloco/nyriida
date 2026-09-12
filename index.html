@@ -118,6 +118,12 @@ h3 { font: 600 14px/1.3 Inter, sans-serif; margin: 0; }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--on); padding: 10px 16px; border-radius: 10px; font-size: 13px; z-index: 50; box-shadow: 0 6px 24px rgba(0,0,0,.2); }
 .toast.error { background: var(--danger); }
 
+/* docx preview */
+.docx { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 32px 40px; max-height: 70vh; overflow-y: auto; font-family: "Times New Roman", serif; color: #111; }
+.docx p { margin: 0 0 8px; }
+.docx table { border-collapse: collapse; }
+.docx td { border: 1px solid #ccc; padding: 4px 6px; }
+
 /* login */
 .login { min-height: 100vh; display: grid; place-items: center; background: var(--brand); color: var(--on); }
 .login .box { width: 380px; }
@@ -150,19 +156,19 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 // ===================== lib/stages.js =====================
 // Engagement stages in order, with what the trainee sees and what unlocks the next one.
 const ENGAGEMENT_STAGES = [
-  { key: "deposit_pending", label: "Deposit pending",   next: "nda_pending",      nextLabel: "Move to NDA",           gate: "€500 deposit paid (Stripe confirms this automatically)" },
-  { key: "nda_pending",     label: "NDA pending",       next: "docs_pending",     nextLabel: "Move to documents",     gate: "NDA signed on the portal (moves on its own)" },
-  { key: "docs_pending",    label: "Documents pending", next: "review_pending",   nextLabel: "Move to review",        gate: "every required document uploaded (moves on its own)" },
-  { key: "review_pending",  label: "Review pending",    next: "proposal",         nextLabel: "Move to proposal",      gate: "Call 2 recorded with a date" },
-  { key: "proposal",        label: "Proposal",          next: "engaged",          nextLabel: "Move to engaged",       gate: "engagement letter signed and fee set (moves on its own)" },
-  { key: "engaged",         label: "Engaged",           next: "valuation_active", nextLabel: "Start valuation",       gate: "Invoice 1 marked paid" },
-  { key: "valuation_active",label: "Valuation active",  next: null },
-  { key: "completed",       label: "Completed",         next: null },
-  { key: "declined",        label: "Declined",          next: null },
+  { key: "nda_pending",     label: "NDA & deposit sent", next: "docs_pending",     nextLabel: "Move to documents", gate: "NDA signed on the portal (moves on its own)" },
+  { key: "docs_pending",    label: "Documents pending",  next: "review_pending",   nextLabel: "Move to review",    gate: "every required document uploaded (moves on its own)" },
+  { key: "review_pending",  label: "Documents in",       next: "proposal",         nextLabel: "Move to proposal",  gate: "nothing; use this when you're preparing the letter" },
+  { key: "proposal",        label: "Letter sent",        next: "engaged",          nextLabel: "Move to engaged",   gate: "engagement letter signed and fee set (moves on its own)" },
+  { key: "engaged",         label: "Engaged",            next: "valuation_active", nextLabel: "Start valuation",   gate: "Invoice 1 paid and €1,000 deposit received" },
+  { key: "valuation_active",label: "Valuation active",   next: null },
+  { key: "completed",       label: "Completed",          next: null },
+  { key: "declined",        label: "Declined",           next: null },
+  { key: "deposit_pending", label: "Not sent",           next: "nda_pending",      nextLabel: "Mark as sent", gate: "" },
 ];
 const stageIndex = (key) => ENGAGEMENT_STAGES.findIndex((s) => s.key === key);
 const stageLabel = (key) => ENGAGEMENT_STAGES.find((s) => s.key === key)?.label ?? key;
-const LIVE_STAGES = ENGAGEMENT_STAGES.slice(0, 7).map((s) => s.key);
+const LIVE_STAGES = ["deposit_pending","nda_pending","docs_pending","review_pending","proposal","engaged","valuation_active"];
 
 const APPROACHES = [
   { key: "dcf", label: "Income approach (DCF)" },
@@ -171,7 +177,8 @@ const APPROACHES = [
   { key: "nav", label: "Asset-based approach (NAV)" },
 ];
 
-const INVOICE_NAMES = { 0: "Deposit", 1: "Invoice 1 (on signing)", 2: "Invoice 2 (final report)" };
+const INVOICE_NAMES = { 0: "Deposit (€1,000)", 1: "Invoice 1 (on signing)", 2: "Invoice 2 (before final report)" };
+const PORTAL_URL = window.location.origin + "/portal";
 
 const eur = (n) => new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(Number(n || 0));
 const money = (n, ccy = "EUR") => new Intl.NumberFormat("en-IE", { style: "currency", currency: ccy, maximumFractionDigits: 2 }).format(Number(n || 0));
@@ -365,33 +372,24 @@ function Leads() {
     </>
   );
 
+  const engOf = (l) => engByOpp[l.ghl_id];
+  const SENT = ["nda_pending","docs_pending","review_pending","proposal"], ENGAGED = ["engaged","valuation_active","completed"];
+  const inGhl = leads.filter((l) => !engOf(l) || engOf(l).stage === "deposit_pending" || engOf(l).stage === "declined");
+  const firstWithLeads = Math.min(...stages.filter((st) => inGhl.some((l) => l.stage_id === st.ghl_id)).map((st) => st.position), Infinity);
+  const shownStages = stages.filter((st) => st.position >= firstWithLeads);
+  const col = (title, rows, chip) => (
+    <div className="col" key={title}>
+      <h3>{title}<span>{rows.length}</span></h3>
+      {rows.map((l) => <LeadCard key={l.ghl_id} l={l} eng={engOf(l)} onOpen={() => setOpen(l)} />)}
+    </div>
+  );
   return (
     <>
       <Head lastSync={lastSync} count={leads.length} reload={load} />
       <div className="board">
-        {stages.map((st) => {
-          const rows = leads.filter((l) => l.stage_id === st.ghl_id);
-          return (
-            <div className="col" key={st.ghl_id}>
-              <h3>{st.name}<span>{rows.length}</span></h3>
-              {rows.map((l) => (
-                <div className="lead" key={l.ghl_id} onClick={() => setOpen(l)}>
-                  <div className="name">{l.name}</div>
-                  <div className="meta">
-                    <span>{l.company || [l.first_name, l.last_name].filter(Boolean).join(" ")}</span>
-                    <span>{ago(l.ghl_updated_at)}</span>
-                  </div>
-                  <div className="row" style={{ marginTop: 6, gap: 6 }}>
-                    {l.country && <Chip>{l.country}</Chip>}
-                    {l.monetary_value > 0 && <Chip>{eur(l.monetary_value)}</Chip>}
-                    {l.recordings > 0 && <Chip>Fathom ×{l.recordings}</Chip>}
-                    {engByOpp[l.ghl_id] && <Chip kind="accent">engagement</Chip>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          );
-        })}
+        {shownStages.map((st) => col(st.name, inGhl.filter((l) => l.stage_id === st.ghl_id)))}
+        {col("NDA & deposit sent", leads.filter((l) => engOf(l) && SENT.includes(engOf(l).stage)))}
+        {col("Engaged", leads.filter((l) => engOf(l) && ENGAGED.includes(engOf(l).stage)))}
       </div>
       {open && <LeadDrawer lead={open} engagement={engByOpp[open.ghl_id]} onClose={() => setOpen(null)} reload={load} />}
     </>
@@ -409,6 +407,80 @@ function Intake({ custom, title = "Intake form" }) {
         {rows.map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd>{String(v)}</dd></Fragment>)}
       </dl>
     </>
+  );
+}
+
+function LeadCard({ l, eng, onOpen }) {
+  return (
+    <div className="lead" onClick={onOpen}>
+      <div className="name">{l.name}</div>
+      <div className="meta">
+        <span>{l.company || [l.first_name, l.last_name].filter(Boolean).join(" ")}</span>
+        <span>{ago(l.ghl_updated_at)}</span>
+      </div>
+      <div className="row" style={{ marginTop: 6, gap: 6 }}>
+        {l.country && <Chip>{l.country}</Chip>}
+        {l.monetary_value > 0 && <Chip>{eur(l.monetary_value)}</Chip>}
+        {l.recordings > 0 && <Chip>Fathom ×{l.recordings}</Chip>}
+        {eng && <Chip kind={eng.stage === "declined" ? "danger" : "accent"}>{stageLabel(eng.stage)}</Chip>}
+      </div>
+    </div>
+  );
+}
+
+/** Convert a lead: everything the NDA and the deposit invoice need, in one form. */
+function ConvertForm({ lead, onCancel }) {
+  const nav = useNavigate();
+  const [run, busy] = useAction();
+  const c = lead.custom ?? {};
+  const [f, setF] = useState({
+    client_name: [lead.first_name, lead.last_name].filter(Boolean).join(" "),
+    client_title: "Director",
+    client_email: lead.email ?? "",
+    company_name: lead.company ?? "",
+    company_address: "",
+    company_country: lead.country === "CY" ? "Cyprus" : (lead.country ?? ""),
+    company_tax_id: "",
+    company_industry: c["Industry"] ?? c["industry"] ?? "",
+    is_individual: false,
+  });
+  const set = (k) => (x) => setF({ ...f, [k]: x.target.type === "checkbox" ? x.target.checked : x.target.value });
+  async function create() {
+    await run(async () => {
+      const e = await rpc("staff_create_engagement", { p_opportunity: lead.ghl_id, p_client_name: f.client_name, p_client_email: f.client_email });
+      const { error } = await supabase.from("engagements").update({
+        client_title: f.client_title || null, company_name: f.is_individual ? null : (f.company_name || null),
+        company_address: f.company_address || null, company_country: f.company_country || null,
+        company_tax_id: f.company_tax_id || null, company_industry: f.company_industry || null, is_individual: f.is_individual,
+      }).eq("id", e.id);
+      if (error) throw new Error(error.message);
+      nav(`/app/engagements/${e.id}`);
+    });
+  }
+  const ready = f.client_name && f.client_email && f.company_address && f.company_country;
+  return (
+    <div className="stack">
+      <h3>Convert to engagement</h3>
+      <p className="muted small" style={{ margin: 0 }}>These details go on the NDA and the €1,000 deposit invoice. You send them from the next screen.</p>
+      <Field label="Signatory full name (as on the NDA)"><input value={f.client_name} onChange={set("client_name")} /></Field>
+      <div className="grid2">
+        <Field label="Title"><input value={f.client_title} onChange={set("client_title")} placeholder="Director" /></Field>
+        <Field label="Email (their portal login)"><input type="email" value={f.client_email} onChange={set("client_email")} /></Field>
+      </div>
+      <label className="check"><input type="checkbox" checked={f.is_individual} onChange={set("is_individual")} />Contracting as an individual, not a company</label>
+      {!f.is_individual && <Field label="Company name"><input value={f.company_name} onChange={set("company_name")} /></Field>}
+      <Field label="Registered address"><textarea rows={2} value={f.company_address} onChange={set("company_address")} placeholder="Street, city, postcode" /></Field>
+      <div className="grid2">
+        <Field label="Country (drives NDA law + invoicing entity)"><input value={f.company_country} onChange={set("company_country")} /></Field>
+        <Field label="Registration / tax no. (optional)"><input value={f.company_tax_id} onChange={set("company_tax_id")} /></Field>
+      </div>
+      <Field label="Industry (optional)"><input value={f.company_industry} onChange={set("company_industry")} /></Field>
+      <div className="note">Invoiced by: <strong>{entityFor(f.company_country)}</strong>. The client can correct address, country, tax no. and industry on their portal.</div>
+      <div className="row">
+        <button className="btn primary" disabled={!ready || busy} onClick={create}>Create engagement</button>
+        <button className="btn" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
   );
 }
 
@@ -502,16 +574,7 @@ function LeadDrawer({ lead, engagement, onClose, reload }) {
           This lead already has an engagement. <button className="btn link" onClick={() => nav(`/app/engagements/${engagement.id}`)}>Open it</button>
         </div>
       ) : convert ? (
-        <div className="stack">
-          <h3>Convert to engagement</h3>
-          <p className="muted small" style={{ margin: 0 }}>Creates the engagement and the €500 deposit invoice. The Stripe link comes on the next screen.</p>
-          <Field label="Signatory full name (as it will appear on the NDA)"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
-          <Field label="Signatory email (their portal login)"><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-          <div className="row">
-            <button className="btn primary" disabled={!name || !email || busy} onClick={doConvert}>Create engagement</button>
-            <button className="btn" onClick={() => setConvert(false)}>Cancel</button>
-          </div>
-        </div>
+        <ConvertForm lead={lead} onCancel={() => setConvert(false)} />
       ) : (
         <button className="btn primary" onClick={() => setConvert(true)}>Convert to engagement</button>
       )}
@@ -525,15 +588,17 @@ const chipKind = (s) => (s === "declined" ? "danger" : s === "completed" ? "ok" 
 function Engagements() {
   const nav = useNavigate();
   const [rows, setRows] = useState(null);
+  const [quiet, setQuiet] = useState([]);
   const [filter, setFilter] = useState("live");
 
   useEffect(() => {
-    supabase.from("engagements").select("id, stage, client_name, client_email, company_name, company_country, fee, updated_at, created_at")
+    supabase.from("engagements").select("id, stage, client_name, client_email, company_name, company_country, fee, updated_at, created_at, sent_at, last_client_activity_at")
       .order("updated_at", { ascending: false })
       .then(({ data }) => setRows(data ?? []));
+    supabase.from("engagements_quiet").select("id").then(({ data }) => setQuiet((data ?? []).map((x) => x.id)));
   }, []);
 
-  const shown = (rows ?? []).filter((r) => filter === "all" ? true : filter === "live" ? LIVE_STAGES.includes(r.stage) : r.stage === filter);
+  const shown = (rows ?? []).filter((r) => filter === "all" ? true : filter === "live" ? LIVE_STAGES.includes(r.stage) : filter === "quiet" ? quiet.includes(r.id) : r.stage === filter);
   const counts = Object.fromEntries(ENGAGEMENT_STAGES.map((s) => [s.key, (rows ?? []).filter((r) => r.stage === s.key).length]));
 
   return (
@@ -546,6 +611,7 @@ function Engagements() {
         {ENGAGEMENT_STAGES.filter((s) => counts[s.key] > 0).map((s) => (
           <button key={s.key} className={`btn ${filter === s.key ? "primary" : ""}`} onClick={() => setFilter(s.key)}>{s.label} · {counts[s.key]}</button>
         ))}
+        <button className={`btn ${filter === "quiet" ? "primary" : ""}`} onClick={() => setFilter("quiet")} title="No client activity for 7+ days">Quiet · {quiet.length}</button>
         <button className={`btn ${filter === "all" ? "primary" : ""}`} onClick={() => setFilter("all")}>All</button>
       </div>
       <div className="card">
@@ -553,7 +619,7 @@ function Engagements() {
           <Empty title="Nothing here">Convert a lead from the Leads board to start an engagement.</Empty>
         ) : (
           <table className="table">
-            <thead><tr><th>Client</th><th>Company</th><th>Stage</th><th>Fee</th><th>Updated</th></tr></thead>
+            <thead><tr><th>Client</th><th>Company</th><th>Stage</th><th>Fee</th><th>Last activity</th></tr></thead>
             <tbody>
               {shown.map((r) => (
                 <tr key={r.id} className="click" onClick={() => nav(`/app/engagements/${r.id}`)}>
@@ -561,7 +627,7 @@ function Engagements() {
                   <td>{r.company_name || "—"}<div className="muted small">{r.company_country}</div></td>
                   <td><Chip kind={chipKind(r.stage)}>{stageLabel(r.stage)}</Chip></td>
                   <td>{r.fee ? eur(r.fee) : <span className="muted">not set</span>}</td>
-                  <td className="muted">{ago(r.updated_at)}</td>
+                  <td className="muted">{r.last_client_activity_at ? `client ${ago(r.last_client_activity_at)}` : r.sent_at ? `sent ${ago(r.sent_at)}` : ago(r.updated_at)}</td>
                 </tr>
               ))}
             </tbody>
@@ -624,9 +690,9 @@ function EngagementDetail() {
       <div className="grid2" style={{ marginTop: 18 }}>
         <div className="stack" style={{ gap: 16 }}>
           <NextStep e={e} st={st} deposit={deposit} docs={docs} invoices={invoices} agreements={agreements} reload={load} />
-          {["docs_pending", "review_pending", "proposal", "engaged", "valuation_active", "completed"].includes(e.stage) && (
-            <Checklist e={e} docs={docs} reload={load} />
-          )}
+          {!["declined"].includes(e.stage) && <LetterCard e={e} reload={load} agreements={agreements} />}
+          <Checklist e={e} docs={docs} reload={load} />
+          <ShareDocCard e={e} reload={load} />
           {canDecline && <DeclineBox e={e} reload={load} />}
         </div>
         <div className="stack" style={{ gap: 16 }}>
@@ -634,6 +700,7 @@ function EngagementDetail() {
           {contact?.custom && Object.keys(contact.custom).length > 0 && (
             <Card title="What they told us at intake"><Intake custom={contact.custom} title={null} /></Card>
           )}
+          <DepositCard e={e} deposit={deposit} reload={load} />
           <Invoices invoices={invoices} deposit={deposit} reload={load} />
           <Card title="Activity">
             {feed.length === 0 ? <span className="muted small">Nothing yet.</span> : (
@@ -652,7 +719,7 @@ function EngagementDetail() {
 
 function Stepper({ stage }) {
   const idx = stageIndex(stage);
-  const steps = ENGAGEMENT_STAGES.slice(0, 8);
+  const steps = ENGAGEMENT_STAGES.slice(0, 7);
   return (
     <div className="stepper">
       {steps.map((s, i) => {
@@ -672,24 +739,24 @@ function NextStep({ e, st, deposit, docs, invoices, agreements, reload }) {
 
   const body = (() => {
     switch (e.stage) {
-      case "deposit_pending": return <DepositStep e={e} deposit={deposit} reload={reload} />;
-      case "nda_pending": return <AgreementStep kind="nda" label="NDA" agreements={agreements} />;
+      case "deposit_pending":
+      case "nda_pending": return <SendNdaStep e={e} agreements={agreements} reload={reload} />;
       case "docs_pending": return (
         <p className="small" style={{ margin: 0 }}>
-          The client uploads against the checklist below. When the last required item is in, this moves to Review on its own.
-          {docs.length === 0 && <> <strong>Add the checklist items first</strong> or the client sees an empty page.</>}
+          NDA signed. The client is uploading against the checklist below; when the last required item is in, this moves on its own.
+          You can send the engagement letter now if the fee is agreed (below).
         </p>
       );
-      case "review_pending": return <Call2Step e={e} reload={reload} />;
-      case "proposal": return <ProposalStep e={e} reload={reload} agreements={agreements} />;
+      case "review_pending": return <p className="small" style={{ margin: 0 }}>Documents are in. Set the fee and approaches below and send the engagement letter.</p>;
+      case "proposal": return <AgreementStep kind="engagement_letter" label="Engagement letter" agreements={agreements} />;
       case "engaged": return (
         <p className="small" style={{ margin: 0 }}>
-          Invoice 1 is issued (right). When the bank transfer lands, mark it paid there, then start the valuation.
+          Letter signed, Invoice 1 issued (right). When the transfer lands, mark it paid there, then start the valuation.
         </p>
       );
-      case "valuation_active": return <p className="small" style={{ margin: 0 }}>Project created. The Projects screen arrives in slice 4.</p>;
-      case "completed": return <p className="small" style={{ margin: 0 }}>Done. Invoice 2 paid, project closed.</p>;
-      case "declined": return <p className="small" style={{ margin: 0 }}>Declined{e.declined_reason ? `: ${e.declined_reason}` : ""}. Deposit refunded if it had been paid.</p>;
+      case "valuation_active": return <p className="small" style={{ margin: 0 }}>Project created. The Projects screen arrives in the next slice.</p>;
+      case "completed": return <p className="small" style={{ margin: 0 }}>Done. Invoice 2 paid, final report delivered.</p>;
+      case "declined": return <p className="small" style={{ margin: 0 }}>Declined{e.declined_reason ? `: ${e.declined_reason}` : ""}. Deposit kept.</p>;
       default: return null;
     }
   })();
@@ -704,47 +771,54 @@ function NextStep({ e, st, deposit, docs, invoices, agreements, reload }) {
   );
 }
 
-function DepositStep({ e, deposit, reload }) {
+async function callFn(name, body) {
+  const { data, error } = await supabase.functions.invoke(name, { body });
+  if (error) throw new Error((await error.context?.json?.().catch(() => null))?.error ?? error.message);
+  if (data?.ok === false) throw new Error(data.error);
+  return data;
+}
+
+function SendNdaStep({ e, agreements, reload }) {
   const [run, busy] = useAction();
-  const toast = useToast();
-  async function getLink() {
-    await run(async () => {
-      const { data, error } = await supabase.functions.invoke("create-deposit-checkout", { body: { engagement_id: e.id } });
-      if (error) throw new Error((await error.context?.json?.())?.error ?? error.message);
-      if (data?.error) throw new Error(data.error);
-      await reload();
-    }, "Payment link ready");
-  }
-  const copy = () => navigator.clipboard.writeText(deposit.checkout_url).then(() => toast("Link copied"));
-  const [ref, setRef] = useState("");
-  const [bank, setBank] = useState(false);
-  const recordBank = () => run(() => rpc("staff_record_deposit_paid", { p_engagement: e.id, p_reference: ref || null }).then(reload), "Deposit recorded, moved to NDA");
+  const nda = agreements.filter((a) => a.kind === "nda" && a.status !== "void").at(-1);
+  const missing = [!e.company_address && "address", !e.company_country && "country"].filter(Boolean);
+  const send = () => run(() => callFn("engagement-send", { engagement_id: e.id, kind: "nda" }).then(reload), "NDA, deposit invoice and portal link sent");
   return (
     <div className="stack">
-      <p className="small" style={{ margin: 0 }}>
-        The client pays the €500 deposit by bank transfer (details are on the deposit invoice) or, once Stripe is connected, by card.
-        Either way this moves to NDA when the money is in.
-      </p>
-      {deposit?.checkout_url ? (
-        <div className="row">
-          <input readOnly value={deposit.checkout_url} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)", fontSize: 12 }} />
-          <button className="btn" onClick={copy}>Copy</button>
-          <a className="btn" href={deposit.checkout_url} target="_blank" rel="noreferrer">Open</a>
-        </div>
-      ) : bank ? (
-        <div className="row">
-          <input placeholder="Bank reference (optional)" value={ref} onChange={(x) => setRef(x.target.value)} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)" }} />
-          <button className="btn primary" disabled={busy} onClick={recordBank}>Confirm €500 received</button>
-          <button className="btn" onClick={() => setBank(false)}>Cancel</button>
+      {nda ? (
+        <div className="small">NDA v{nda.version} <Chip kind={nda.status === "signed" ? "ok" : "warn"}>{nda.status}</Chip> sent {day(nda.sent_at)}{nda.signed_at && ` · signed ${day(nda.signed_at)}`}</div>
+      ) : (
+        <p className="small" style={{ margin: 0 }}>One click emails the client from info@: the NDA (filled with their details), the €1,000 deposit invoice, and the link to their Solonos page.</p>
+      )}
+      {missing.length > 0 && <div className="err">Fill in the client's {missing.join(" and ")} (Client details, right) before sending.</div>}
+      <div className="row">
+        <button className="btn primary" disabled={busy || missing.length > 0} onClick={send}>{nda ? "Resend NDA + deposit" : "Send NDA + deposit + portal link"}</button>
+        <a className="btn" href={PORTAL_URL} target="_blank" rel="noreferrer">Open portal</a>
+      </div>
+    </div>
+  );
+}
+
+function DepositCard({ e, deposit, reload }) {
+  const [run, busy] = useAction();
+  const [ref, setRef] = useState("");
+  const paid = () => run(() => rpc("staff_mark_deposit_paid", { p_engagement: e.id, p_reference: ref || null }).then(reload), "Deposit marked paid");
+  const kind = { pending: "warn", claimed: "accent", paid: "ok", credited: "ok", kept: "", refunded: "" }[deposit?.status] ?? "";
+  return (
+    <Card title="€1,000 deposit" right={deposit && <Chip kind={kind}>{deposit.status === "claimed" ? "client says paid" : deposit.status}</Chip>}>
+      {!deposit ? <span className="muted small">No deposit row.</span> : ["pending", "claimed"].includes(deposit.status) ? (
+        <div className="stack">
+          {deposit.status === "claimed" && <div className="note">Client clicked "I've paid" {ago(deposit.client_claimed_at)}{deposit.client_reference && ` · ref ${deposit.client_reference}`}. Check the bank, then confirm.</div>}
+          <div className="row">
+            <input placeholder="Bank reference (optional)" value={ref} onChange={(x) => setRef(x.target.value)} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)" }} />
+            <button className="btn primary" disabled={busy} onClick={paid}>Mark paid</button>
+          </div>
+          <span className="muted small">Non-refundable. Credited against Invoice 1 when the letter is signed.</span>
         </div>
       ) : (
-        <div className="row">
-          <button className="btn primary" disabled={busy} onClick={() => setBank(true)}>Record bank transfer</button>
-          <button className="btn" disabled={busy} onClick={getLink} title="Needs the Stripe key set in the backend">Create Stripe link</button>
-        </div>
+        <span className="small">Received {day(deposit.paid_at)}{deposit.reference && ` · ref ${deposit.reference}`}{deposit.status === "credited" && " · credited against Invoice 1"}{deposit.status === "kept" && " · kept (declined)"}</span>
       )}
-      <div className="muted small">Deposit status: {deposit?.status ?? "no deposit row"}{deposit?.paid_at && ` · paid ${day(deposit.paid_at)}`}{deposit?.method === "bank_transfer" && " by bank transfer"}</div>
-    </div>
+    </Card>
   );
 }
 
@@ -787,11 +861,13 @@ function Call2Step({ e, reload }) {
   );
 }
 
-function ProposalStep({ e, reload, agreements }) {
+function LetterCard({ e, reload, agreements }) {
   const [run, busy] = useAction();
   const [fee, setFee] = useState(e.fee ?? "");
   const [appr, setAppr] = useState(e.approaches ?? []);
   const toggle = (k) => setAppr((a) => (a.includes(k) ? a.filter((x) => x !== k) : [...a, k]));
+  const letter = agreements.filter((a) => a.kind === "engagement_letter" && a.status !== "void").at(-1);
+  const locked = ["engaged", "valuation_active", "completed", "declined"].includes(e.stage);
   async function save() {
     await run(async () => {
       const { error } = await supabase.from("engagements").update({ fee: Number(fee), approaches: appr }).eq("id", e.id);
@@ -799,27 +875,67 @@ function ProposalStep({ e, reload, agreements }) {
       await reload();
     }, "Terms saved");
   }
+  const send = () => run(() => callFn("engagement-send", { engagement_id: e.id, kind: "letter" }).then(reload), "Engagement letter sent");
   const half = Math.min(Number(fee || 0) * 0.5, 5000);
+  const saved = e.fee && Number(e.fee) === Number(fee) && JSON.stringify(e.approaches ?? []) === JSON.stringify(appr);
   return (
-    <div className="stack">
-      <p className="small" style={{ margin: 0 }}>Set the fee and approaches, save, then generate the letter. Signing moves this to Engaged and issues Invoice 1.</p>
-      <div className="grid2">
-        <Field label="Total fee (EUR, no VAT)"><input type="number" min="0" step="100" value={fee} onChange={(x) => setFee(x.target.value)} /></Field>
-        <div className="note" style={{ alignSelf: "end" }}>
-          Invoice 1: <strong>{eur(Math.max(half - 500, 0))}</strong> on signing · Invoice 2: <strong>{eur(Math.max(Number(fee || 0) - half, 0))}</strong> on final report · €500 deposit credited
+    <Card title="Engagement letter" right={letter && <Chip kind={letter.status === "signed" ? "ok" : "warn"}>v{letter.version} {letter.status}</Chip>}>
+      {locked ? (
+        <span className="small">{letter ? `Signed ${day(letter.signed_at)}. Fee ${eur(e.fee)}.` : "—"}</span>
+      ) : (
+        <div className="stack">
+          <div className="grid2">
+            <Field label="Total fee (EUR, no VAT)"><input type="number" min="0" step="100" value={fee} onChange={(x) => setFee(x.target.value)} /></Field>
+            <div className="note" style={{ alignSelf: "end" }}>
+              Invoice 1 on signing: <strong>{eur(Math.max(half - 1000, 0))}</strong> · Invoice 2 before final report: <strong>{eur(Math.max(Number(fee || 0) - half, 0))}</strong> · €1,000 deposit credited
+            </div>
+          </div>
+          <div className="stack" style={{ gap: 6 }}>
+            {APPROACHES.map((a) => (
+              <label key={a.key} className="check"><input type="checkbox" checked={appr.includes(a.key)} onChange={() => toggle(a.key)} />{a.label}</label>
+            ))}
+          </div>
+          <div className="row">
+            <button className="btn" disabled={busy || !fee || appr.length === 0 || saved} onClick={save}>{saved ? "Terms saved" : "Save terms"}</button>
+            <button className="btn primary" disabled={busy || !saved} onClick={send}>{letter ? "Resend letter" : "Send engagement letter"}</button>
+            {letter && <span className="muted small">sent {day(letter.sent_at)}</span>}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ShareDocCard({ e, reload }) {
+  const [run, busy] = useAction();
+  const [docs, setDocs] = useState([]);
+  const [label, setLabel] = useState("Valuation snapshot");
+  const load = useCallback(async () => {
+    const { data } = await supabase.from("documents").select("*").eq("engagement_id", e.id).eq("visibility", "client").neq("kind", "invoice").order("created_at", { ascending: false });
+    setDocs(data ?? []);
+  }, [e.id]);
+  useEffect(() => { load(); }, [load]);
+  async function upload(file) {
+    await run(async () => {
+      const path = `${e.id}/${Date.now()}-${file.name}`;
+      const { error } = await supabase.storage.from("deliverables").upload(path, file);
+      if (error) throw new Error(error.message);
+      const { error: e2 } = await supabase.from("documents").insert({ engagement_id: e.id, kind: "six_page_review", name: label || file.name, storage_path: `deliverables/${path}`, visibility: "client", uploaded_by: "staff" });
+      if (e2) throw new Error(e2.message);
+      await load();
+    }, "Shared with the client");
+  }
+  return (
+    <Card title="Shared with the client">
+      <div className="stack" style={{ gap: 6 }}>
+        {docs.map((d) => <div key={d.id} className="row between small"><span>{d.name}</span><span className="muted">{ago(d.created_at)}</span></div>)}
+        {docs.length === 0 && <span className="muted small">Nothing yet. Upload the Valuation Builder PDF here and the client sees it on their page.</span>}
+        <div className="row">
+          <input value={label} onChange={(x) => setLabel(x.target.value)} placeholder="Name shown to the client" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)" }} />
+          <label className="btn" style={{ cursor: "pointer" }}>{busy ? "Uploading…" : "Upload file"}<input type="file" style={{ display: "none" }} onChange={(x) => x.target.files[0] && upload(x.target.files[0])} /></label>
         </div>
       </div>
-      <div className="stack" style={{ gap: 6 }}>
-        {APPROACHES.map((a) => (
-          <label key={a.key} className="check"><input type="checkbox" checked={appr.includes(a.key)} onChange={() => toggle(a.key)} />{a.label}</label>
-        ))}
-      </div>
-      <div className="row">
-        <button className="btn" disabled={busy || !fee || appr.length === 0} onClick={save}>Save terms</button>
-        <span className="muted small">{e.fee ? `saved: ${eur(e.fee)}, ${(e.approaches ?? []).length} approach(es)` : "not saved yet"}</span>
-      </div>
-      <AgreementStep kind="engagement_letter" label="Engagement letter" agreements={agreements} />
-    </div>
+    </Card>
   );
 }
 
@@ -828,7 +944,7 @@ function Checklist({ e, docs, reload }) {
   const [run, busy] = useAction();
   const [label, setLabel] = useState("");
   const [required, setRequired] = useState(true);
-  const locked = !["docs_pending", "review_pending"].includes(e.stage);
+  const locked = !["deposit_pending", "nda_pending", "docs_pending", "review_pending", "proposal"].includes(e.stage);
 
   const add = () => run(async () => {
     const { error } = await supabase.from("client_documents").insert({ engagement_id: e.id, label, required });
@@ -894,13 +1010,13 @@ function DeclineBox({ e, reload }) {
     if (error) throw new Error(error.message);
     await rpc("staff_advance_engagement", { p_id: e.id, p_to: "declined" });
     await reload(); setOpen(false);
-  }, "Declined. Deposit refunded if it was paid.");
+  }, "Declined.");
   return open ? (
     <Card title="Decline this engagement">
       <div className="stack">
         <Field label="Why? (feeds the conversion report)"><textarea rows={2} value={reason} onChange={(x) => setReason(x.target.value)} placeholder="e.g. Price too high, went with local accountant, timing" /></Field>
         <div className="row">
-          <button className="btn danger" disabled={busy || !reason} onClick={decline}>Decline and refund deposit</button>
+          <button className="btn danger" disabled={busy || !reason} onClick={decline}>Decline (deposit is kept)</button>
           <button className="btn" onClick={() => setOpen(false)}>Keep it</button>
         </div>
       </div>
@@ -915,7 +1031,7 @@ function ClientDetails({ e, reload }) {
   const [run, busy] = useAction();
   const [edit, setEdit] = useState(false);
   const [f, setF] = useState({});
-  const start = () => { setF({ client_name: e.client_name, client_title: e.client_title ?? "", client_email: e.client_email, company_name: e.company_name ?? "", company_address: e.company_address ?? "", company_country: e.company_country ?? "", company_tax_id: e.company_tax_id ?? "", is_individual: e.is_individual }); setEdit(true); };
+  const start = () => { setF({ client_name: e.client_name, client_title: e.client_title ?? "", client_email: e.client_email, company_name: e.company_name ?? "", company_address: e.company_address ?? "", company_country: e.company_country ?? "", company_tax_id: e.company_tax_id ?? "", company_industry: e.company_industry ?? "", is_individual: e.is_individual }); setEdit(true); };
   const save = () => run(async () => {
     const { error } = await supabase.from("engagements").update(f).eq("id", e.id);
     if (error) throw new Error(error.message);
@@ -938,6 +1054,7 @@ function ClientDetails({ e, reload }) {
           <Field label="Country (drives NDA law and invoicing entity)"><input value={f.company_country} onChange={set("company_country")} /></Field>
           <Field label="Tax / registration no."><input value={f.company_tax_id} onChange={set("company_tax_id")} /></Field>
         </div>
+        <Field label="Industry"><input value={f.company_industry} onChange={set("company_industry")} /></Field>
       </div>
     </Card>
   );
@@ -951,9 +1068,10 @@ function ClientDetails({ e, reload }) {
         <dt>Address</dt><dd style={{ whiteSpace: "pre-line" }}>{e.company_address || "—"}</dd>
         <dt>Country</dt><dd>{e.company_country || "—"}</dd>
         <dt>Tax no.</dt><dd>{e.company_tax_id || "—"}</dd>
+        <dt>Industry</dt><dd>{e.company_industry || "—"}</dd>
         <dt>Invoiced by</dt><dd>{entityFor(e.company_country)}</dd>
       </dl>
-      {missing.length > 0 && <div className="note" style={{ marginTop: 10 }}>The NDA needs {missing.join(", ")}. Fill it in before slice 2 generates documents.</div>}
+      {missing.length > 0 && <div className="note" style={{ marginTop: 10 }}>The NDA needs {missing.join(", ")}. Fill it in before sending.</div>}
     </Card>
   );
 }
@@ -985,7 +1103,7 @@ function Invoices({ invoices, reload }) {
           </tbody>
         </table>
       )}
-      <p className="muted small" style={{ margin: "8px 0 0" }}>All three are bank transfers unless Stripe is connected: mark them paid when the money lands. PDFs arrive in slice 3.</p>
+      <p className="muted small" style={{ margin: "8px 0 0" }}>Bank transfers. Mark them paid when the money lands. The deposit is marked paid from its own card above.</p>
     </Card>
   );
 }
@@ -997,6 +1115,11 @@ function describe(f) {
     case "engagement.created": return "Engagement created from lead";
     case "engagement.stage": return `Moved to ${stageLabel(d.to)}`;
     case "deposit.link_created": return "Stripe deposit link created";
+    case "nda.sent": return `NDA v${d.version} + deposit invoice #${d.invoice} emailed to the client`;
+    case "letter.sent": return `Engagement letter v${d.version} emailed (fee ${eur(d.fee)})`;
+    case "deposit.claimed": return `Client says the deposit is paid${d.reference ? ` (ref ${d.reference})` : ""}`;
+    case "client.company_updated": return "Client updated their company details";
+    case "client.uploaded": return `Client uploaded: ${d.label}`;
     case "deposit.paid": return `Deposit received by ${d.method === "bank_transfer" ? "bank transfer" : "card"}${d.reference ? ` (${d.reference})` : ""}`;
     case "invoice.issued": return `${INVOICE_NAMES[d.seq]} issued, #${d.no}, ${eur(d.amount)}`;
     case "invoice.paid": return `${INVOICE_NAMES[d.seq]} paid`;
@@ -1021,6 +1144,310 @@ function ValuationBuilder() {
   );
 }
 
+
+// ===================== portal (client side) =====================
+const PORTAL_STEPS = [
+  { key: "nda", label: "1. Sign the NDA" },
+  { key: "company", label: "2. Company details" },
+  { key: "docs", label: "3. Upload documents" },
+  { key: "deposit", label: "4. Deposit" },
+  { key: "letter", label: "5. Engagement letter" },
+  { key: "invoices", label: "6. Invoices & files" },
+];
+
+function PortalLogin() {
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function send(e) {
+    e.preventDefault(); setBusy(true); setErr("");
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin + "/portal", shouldCreateUser: true } });
+    setBusy(false);
+    if (error) setErr(error.message); else setSent(true);
+  }
+  return (
+    <div className="login">
+      <form className="box" onSubmit={send}>
+        <h1>Consortia Advisory</h1>
+        {sent ? <p>Check {email} for your sign-in link. It opens your page directly.</p> : (
+          <>
+            <p>Your private page for the valuation engagement. Enter the email address we wrote to and we'll send you a one-time link.</p>
+            <input type="email" required placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            {err && <p className="err">{err}</p>}
+            <button className="btn primary" disabled={busy}>{busy ? "Sending…" : "Send me the link"}</button>
+          </>
+        )}
+      </form>
+    </div>
+  );
+}
+
+async function signedUrl(storagePath, seconds = 600) {
+  const [bucket, ...rest] = storagePath.split("/");
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(rest.join("/"), seconds);
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
+}
+
+/** Renders a .docx from storage inside the page (docx-preview) so the client reads what they sign. */
+function DocxView({ storagePath }) {
+  const ref = React.useRef(null);
+  const [state, setState] = useState("loading");
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      try {
+        const url = await signedUrl(storagePath);
+        const blob = await (await fetch(url)).blob();
+        const mod = await import("https://esm.sh/docx-preview@0.3.3");
+        if (dead) return;
+        ref.current.innerHTML = "";
+        await mod.renderAsync(blob, ref.current, undefined, { inWrapper: false, ignoreWidth: true, ignoreHeight: true, useBase64URL: true });
+        setState("ok");
+      } catch (e) { setState("error: " + e.message); }
+    })();
+    return () => { dead = true; };
+  }, [storagePath]);
+  return (
+    <div className="docx">
+      {state === "loading" && <div className="muted small">Loading the document…</div>}
+      {state.startsWith("error") && <div className="err">{state}</div>}
+      <div ref={ref} />
+    </div>
+  );
+}
+
+function SignBox({ agreement, e, onSigned, label }) {
+  const [run, busy] = useAction();
+  const [name, setName] = useState("");
+  const [title, setTitle] = useState(e.client_title ?? "");
+  const [ok, setOk] = useState(false);
+  const sign = () => run(async () => {
+    await rpc("portal_sign_agreement", { p_agreement: agreement.id, p_name: name, p_title: title || null, p_ip: null, p_ua: navigator.userAgent });
+    await onSigned();
+  }, `${label} signed`);
+  if (agreement.status === "signed") return <div className="note">Signed on {day(agreement.signed_at)}. Thank you.</div>;
+  return (
+    <div className="card" style={{ padding: 16, borderColor: "var(--accent)" }}>
+      <h3 style={{ marginBottom: 8 }}>Sign the {label}</h3>
+      <p className="small muted" style={{ marginTop: 0 }}>Type your full name exactly as it appears in the document: <strong>{e.client_name}</strong>.</p>
+      <div className="grid2">
+        <Field label="Full name"><input value={name} onChange={(x) => setName(x.target.value)} /></Field>
+        <Field label="Title"><input value={title} onChange={(x) => setTitle(x.target.value)} placeholder="Director" /></Field>
+      </div>
+      <label className="check" style={{ margin: "10px 0" }}><input type="checkbox" checked={ok} onChange={(x) => setOk(x.target.checked)} />I have read the {label} and agree to be bound by it. Typing my name is my electronic signature.</label>
+      <button className="btn primary" disabled={busy || !ok || !name} onClick={sign}>{busy ? "Signing…" : `Sign the ${label}`}</button>
+    </div>
+  );
+}
+
+function Portal({ session }) {
+  const [e, setE] = useState(undefined);
+  const [agreements, setAgreements] = useState([]);
+  const [docs, setDocs] = useState([]);
+  const [deposit, setDeposit] = useState(null);
+  const [invoices, setInvoices] = useState([]);
+  const [shared, setShared] = useState([]);
+  const [feed, setFeed] = useState([]);
+  const [step, setStep] = useState(null);
+
+  const load = useCallback(async () => {
+    const { data: eng } = await supabase.rpc("portal_my_engagement");
+    if (!eng) { setE(null); return; }
+    setE(eng);
+    const [a, d, dep, inv, sh, f] = await Promise.all([
+      supabase.from("agreements").select("*").eq("engagement_id", eng.id).in("status", ["sent", "signed"]).order("created_at"),
+      supabase.from("client_documents").select("*").eq("engagement_id", eng.id).order("created_at"),
+      supabase.from("deposits").select("*").eq("engagement_id", eng.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("invoices_view").select("*").eq("engagement_id", eng.id).neq("status", "scheduled").order("seq"),
+      supabase.from("documents").select("*").eq("engagement_id", eng.id).eq("visibility", "client").order("created_at", { ascending: false }),
+      supabase.from("activity_log").select("*").eq("engagement_id", eng.id).eq("visible_to_client", true).order("created_at", { ascending: false }).limit(20),
+    ]);
+    setAgreements(a.data ?? []); setDocs(d.data ?? []); setDeposit(dep.data); setInvoices(inv.data ?? []); setShared(sh.data ?? []); setFeed(f.data ?? []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  if (e === undefined) return null;
+  if (e === null) return (
+    <div className="login"><div className="box">
+      <h1>No engagement found</h1>
+      <p>{session.user.email} isn't linked to an engagement. Use the email address we wrote to, or contact info@consortiaadvisory.com.</p>
+      <button className="btn primary" onClick={() => supabase.auth.signOut()}>Try another email</button>
+    </div></div>
+  );
+
+  const nda = agreements.filter((x) => x.kind === "nda").at(-1);
+  const letter = agreements.filter((x) => x.kind === "engagement_letter").at(-1);
+  const done = {
+    nda: nda?.status === "signed",
+    company: !!(e.company_address && e.company_country),
+    docs: docs.length > 0 && docs.filter((d) => d.required).every((d) => d.uploaded_at),
+    deposit: ["paid", "credited", "claimed"].includes(deposit?.status),
+    letter: letter?.status === "signed",
+    invoices: true,
+  };
+  const current = step ?? (!done.nda ? "nda" : !done.company ? "company" : !done.docs ? "docs" : !done.deposit ? "deposit" : letter && !done.letter ? "letter" : "invoices");
+
+  return (
+    <div className="shell">
+      <nav className="sidebar">
+        <div className="wordmark">Consortia Advisory</div>
+        {PORTAL_STEPS.map((st) => (
+          <a key={st.key} href="#" className={current === st.key ? "active" : ""} onClick={(x) => { x.preventDefault(); setStep(st.key); }}>
+            {st.label}{done[st.key] && st.key !== "invoices" && <span className="soon">✓</span>}
+          </a>
+        ))}
+        <div className="foot">
+          {e.client_name}<br /><span style={{ opacity: .7 }}>{e.company_name}</span><br />
+          <button onClick={() => supabase.auth.signOut()}>Sign out</button>
+        </div>
+      </nav>
+      <main className="main">
+        {current === "nda" && (
+          <>
+            <div className="pagehead"><div><h1>Non-Disclosure Agreement</h1><p>Read it below, then sign at the bottom. This is what lets us receive your financial information in confidence.</p></div></div>
+            {nda ? (<><DocxView storagePath={nda.docx_path} /><div style={{ height: 16 }} /><SignBox agreement={nda} e={e} onSigned={load} label="NDA" /></>) : <Empty title="Not sent yet">We'll email you when the NDA is ready.</Empty>}
+          </>
+        )}
+        {current === "company" && <CompanyForm e={e} reload={load} />}
+        {current === "docs" && <UploadStep e={e} docs={docs} reload={load} />}
+        {current === "deposit" && <DepositStepClient e={e} deposit={deposit} invoice={invoices.find((i) => i.seq === 0)} reload={load} />}
+        {current === "letter" && (
+          <>
+            <div className="pagehead"><div><h1>Engagement letter</h1><p>The terms of the valuation engagement. Read it, then sign at the bottom.</p></div></div>
+            {letter ? (<><DocxView storagePath={letter.docx_path} /><div style={{ height: 16 }} /><SignBox agreement={letter} e={e} onSigned={load} label="engagement letter" /></>) : <Empty title="Not sent yet">We'll email you when the engagement letter is ready.</Empty>}
+          </>
+        )}
+        {current === "invoices" && <FilesStep invoices={invoices} shared={shared} feed={feed} />}
+      </main>
+    </div>
+  );
+}
+
+function CompanyForm({ e, reload }) {
+  const [run, busy] = useAction();
+  const [f, setF] = useState({ company_address: e.company_address ?? "", company_country: e.company_country ?? "", company_tax_id: e.company_tax_id ?? "", company_industry: e.company_industry ?? "" });
+  const set = (k) => (x) => setF({ ...f, [k]: x.target.value });
+  const save = () => run(() => rpc("portal_update_company", { p_id: e.id, p_address: f.company_address, p_country: f.company_country, p_tax_id: f.company_tax_id || null, p_industry: f.company_industry || null }).then(reload), "Saved");
+  return (
+    <>
+      <div className="pagehead"><div><h1>Company details</h1><p>Please check and complete. These appear on the engagement letter and invoices.</p></div></div>
+      <Card>
+        <div className="stack">
+          <dl className="kv"><dt>Company</dt><dd>{e.company_name || "Individual"}</dd><dt>Signatory</dt><dd>{e.client_name}{e.client_title && `, ${e.client_title}`}</dd></dl>
+          <Field label="Registered address"><textarea rows={2} value={f.company_address} onChange={set("company_address")} /></Field>
+          <div className="grid2">
+            <Field label="Country of incorporation"><input value={f.company_country} onChange={set("company_country")} /></Field>
+            <Field label="Registration / tax number"><input value={f.company_tax_id} onChange={set("company_tax_id")} /></Field>
+          </div>
+          <Field label="Industry"><input value={f.company_industry} onChange={set("company_industry")} placeholder="e.g. Software, Hospitality, Manufacturing" /></Field>
+          <div><button className="btn primary" disabled={busy || !f.company_address || !f.company_country} onClick={save}>Save</button></div>
+        </div>
+      </Card>
+    </>
+  );
+}
+
+function UploadStep({ e, docs, reload }) {
+  const [run, busy] = useAction();
+  async function upload(d, file) {
+    await run(async () => {
+      const path = `${e.id}/${d.id}-${file.name}`;
+      const { error } = await supabase.storage.from("client-uploads").upload(path, file, { upsert: true });
+      if (error) throw new Error(error.message);
+      await rpc("portal_mark_uploaded", { p_doc: d.id, p_storage_path: `client-uploads/${path}` });
+      await reload();
+    }, `${d.label} uploaded`);
+  }
+  return (
+    <>
+      <div className="pagehead"><div><h1>Upload your documents</h1><p>One file per line. PDF or Excel is fine. Everything is covered by the NDA.</p></div></div>
+      <Card>
+        <div className="stack" style={{ gap: 8 }}>
+          {docs.map((d) => (
+            <div key={d.id} className="row between" style={{ padding: "8px 0", borderBottom: "1px solid var(--border-sub)" }}>
+              <span>{d.uploaded_at ? "✓ " : "○ "}{d.label}{!d.required && <span className="muted small"> (optional)</span>}{d.uploaded_at && <span className="muted small"> · received {day(d.uploaded_at)}</span>}</span>
+              <label className="btn" style={{ cursor: "pointer" }}>{d.uploaded_at ? "Replace" : "Upload"}<input type="file" style={{ display: "none" }} disabled={busy} onChange={(x) => x.target.files[0] && upload(d, x.target.files[0])} /></label>
+            </div>
+          ))}
+          {docs.length === 0 && <span className="muted small">The document list will appear here once we've set it up.</span>}
+        </div>
+      </Card>
+    </>
+  );
+}
+
+function DepositStepClient({ e, deposit, invoice, reload }) {
+  const [run, busy] = useAction();
+  const [ref, setRef] = useState("");
+  const claim = () => run(() => rpc("portal_claim_deposit_paid", { p_id: e.id, p_reference: ref || null }).then(reload), "Thank you, we'll confirm once it lands");
+  const dl = async () => window.open(await signedUrl(invoice.pdf_path), "_blank");
+  const status = deposit?.status;
+  return (
+    <>
+      <div className="pagehead"><div><h1>Engagement deposit</h1><p>EUR 1,000, non-refundable, credited against the first instalment of the fee.</p></div></div>
+      <Card title={invoice ? `Invoice ${invoice.issuing_entity}-${String(invoice.invoice_no).padStart(4, "0")}` : "Deposit"} right={invoice?.pdf_path && <button className="btn" onClick={dl}>Download invoice (PDF)</button>}>
+        {invoice ? (
+          <dl className="kv">
+            <dt>Amount</dt><dd><strong>{money(invoice.amount, invoice.currency)}</strong></dd>
+            <dt>Pay to</dt><dd>{invoice.account_name}</dd>
+            <dt>Bank</dt><dd>{invoice.bank}</dd>
+            <dt>IBAN</dt><dd>{invoice.iban}</dd>
+            <dt>SWIFT / BIC</dt><dd>{invoice.swift}</dd>
+            <dt>Reference</dt><dd>{invoice.issuing_entity}-{String(invoice.invoice_no).padStart(4, "0")}</dd>
+          </dl>
+        ) : <span className="muted small">The deposit invoice will appear here once sent.</span>}
+        <div style={{ marginTop: 16 }}>
+          {status === "pending" && (
+            <div className="row">
+              <input placeholder="Your bank reference (optional)" value={ref} onChange={(x) => setRef(x.target.value)} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)" }} />
+              <button className="btn primary" disabled={busy} onClick={claim}>I've made the transfer</button>
+            </div>
+          )}
+          {status === "claimed" && <div className="note">Thank you. We'll confirm as soon as the transfer lands.</div>}
+          {["paid", "credited"].includes(status) && <div className="note">Received on {day(deposit.paid_at)}. Thank you.</div>}
+        </div>
+      </Card>
+    </>
+  );
+}
+
+function FilesStep({ invoices, shared, feed }) {
+  const open = async (path) => window.open(await signedUrl(path), "_blank");
+  return (
+    <>
+      <div className="pagehead"><div><h1>Invoices & files</h1><p>Everything we've issued or shared with you.</p></div></div>
+      <div className="grid2">
+        <Card title="Invoices">
+          {invoices.length === 0 ? <span className="muted small">None yet.</span> : (
+            <table className="table"><tbody>
+              {invoices.map((i) => (
+                <tr key={i.id}>
+                  <td>{INVOICE_NAMES[i.seq]}<div className="muted small">{i.issuing_entity}-{String(i.invoice_no).padStart(4, "0")}{i.due_at && ` · due ${day(i.due_at)}`}</div></td>
+                  <td style={{ textAlign: "right" }}>{money(i.amount, i.currency)}</td>
+                  <td style={{ textAlign: "right" }}><Chip kind={i.status === "paid" ? "ok" : "warn"}>{i.status}</Chip></td>
+                  <td style={{ textAlign: "right" }}>{i.pdf_path && <button className="btn" onClick={() => open(i.pdf_path)}>PDF</button>}</td>
+                </tr>
+              ))}
+            </tbody></table>
+          )}
+        </Card>
+        <Card title="Files from Consortia">
+          {shared.filter((d) => d.kind !== "invoice").length === 0 ? <span className="muted small">Nothing shared yet.</span> : (
+            <div className="stack" style={{ gap: 6 }}>
+              {shared.filter((d) => d.kind !== "invoice").map((d) => <div key={d.id} className="row between small"><span>{d.name}</span><button className="btn" onClick={() => open(d.storage_path)}>Open</button></div>)}
+            </div>
+          )}
+        </Card>
+      </div>
+      <Card title="Activity" style={{ marginTop: 16 }}>
+        <ul className="feed">{feed.map((f) => <li key={f.id}><span className="when">{ago(f.created_at)}</span><span>{describe(f)}</span></li>)}</ul>
+      </Card>
+    </>
+  );
+}
+
 // ===================== App.jsx =====================
 const NAV = [
   ["Dashboard", "/app/dashboard", 5],
@@ -1033,7 +1460,6 @@ const NAV = [
   ["Time", "/app/time", 4],
   ["Invoices", "/app/invoices", 3],
   ["Reports", "/app/reports", 5],
-  ["Portal preview", "/app/portal", 2],
 ];
 
 function SetPassword() {
@@ -1063,6 +1489,7 @@ function Shell({ session, staff, signOut }) {
     <div className="shell">
       <nav className="sidebar">
         <div className="wordmark">Solonos</div>
+        <a href="/portal" target="_blank" rel="noreferrer">Client portal <span className="soon">↗</span></a>
         {NAV.map(([label, to, slice]) => (
           <NavLink key={to} to={to} className={({ isActive }) => (isActive ? "active" : "")}>
             {label}{slice && <span className="soon">slice {slice}</span>}
@@ -1093,6 +1520,7 @@ function App() {
   const [session, setSession] = useState(undefined);
   const [staff, setStaff] = useState(null);
   const nav = useNavigate();
+  const isPortal = useLocation().pathname.startsWith("/portal");
 
   useEffect(() => {
     if (!configured) return;
@@ -1102,24 +1530,27 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!session) { setStaff(null); return; }
+    if (!session || isPortal) { setStaff(null); return; }
     supabase.from("staff").select("full_name, role").eq("user_id", session.user.id).maybeSingle()
       .then(({ data }) => setStaff(data ?? false));
-  }, [session]);
+  }, [session, isPortal]);
 
   if (!configured) return (
-    <div className="login"><div className="box">
-      <h1>Not connected</h1>
-      <p>Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel (or a local .env) and redeploy.</p>
-    </div></div>
+    <div className="login"><div className="box"><h1>Not connected</h1><p>Supabase URL or key missing at the top of index.html.</p></div></div>
   );
   if (session === undefined) return null;
+
+  if (isPortal) {
+    if (!session) return <PortalLogin />;
+    return <ToastProvider><Portal session={session} /></ToastProvider>;
+  }
+
   if (!session) return <Login />;
   if (staff === null) return null;
   if (staff === false) return (
     <div className="login"><div className="box">
       <h1>Not staff</h1>
-      <p>{session.user.email} is signed in but isn't in the staff table. A partner adds you with one SQL line (README step 4).</p>
+      <p>{session.user.email} is signed in but isn't in the staff table. If you're a client, your page is at <a href="/portal" style={{ color: "var(--on)" }}>solonos.io/portal</a>.</p>
       <button className="btn primary" onClick={() => supabase.auth.signOut()}>Sign out</button>
     </div></div>
   );
