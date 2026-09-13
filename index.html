@@ -205,6 +205,13 @@ async function rpc(fn, args) {
   return data;
 }
 
+/** Sign out that always works: clear the browser session first, then reload to the right start page. */
+async function logout(to) {
+  try { await supabase.auth.signOut({ scope: "local" }); } catch (_) {}
+  try { await supabase.auth.signOut(); } catch (_) {}
+  window.location.href = to ?? (window.location.pathname.startsWith("/portal") ? "/portal" : "/");
+}
+
 /** "Gate: NDA not signed" instead of Postgres noise. */
 function cleanError(msg = "") {
   return msg.replace(/^.*?(Gate:|Cannot|Staff only|Not your|Typed name|Signer email)/, "$1").trim() || "Something went wrong";
@@ -1345,7 +1352,7 @@ function Portal({ session }) {
     <div className="login"><div className="box">
       <h1>No engagement found</h1>
       <p>You're signed in as <strong>{session.user.email}</strong>, and that address isn't linked to an engagement. Sign out and use the email address we wrote to, or contact info@consortiaadvisory.com.</p>
-      <button className="btn primary" onClick={() => supabase.auth.signOut()}>Try another email</button>
+      <button className="btn primary" onClick={() => logout("/portal")}>Try another email</button>
     </div></div>
   );
 
@@ -1372,7 +1379,7 @@ function Portal({ session }) {
         ))}
         <div className="foot">
           {e.client_name}<br /><span style={{ opacity: .7 }}>{e.company_name}</span><br />
-          <button onClick={() => supabase.auth.signOut()}>Sign out</button>
+          <button onClick={() => logout("/portal")}>Sign out</button>
         </div>
       </nav>
       <main className="main">
@@ -1625,13 +1632,13 @@ function App() {
     <div className="login"><div className="box">
       <h1>Not staff</h1>
       <p>{session.user.email} is signed in but isn't in the staff table. If you're a client, your page is at <a href="/portal" style={{ color: "var(--on)" }}>solonos.io/portal</a>.</p>
-      <button className="btn primary" onClick={() => supabase.auth.signOut()}>Sign out</button>
+      <button className="btn primary" onClick={() => logout("/")}>Sign out</button>
     </div></div>
   );
 
   return (
     <ToastProvider>
-      <Shell session={session} staff={staff} signOut={() => supabase.auth.signOut().then(() => nav("/"))} />
+      <Shell session={session} staff={staff} signOut={() => logout("/")} />
     </ToastProvider>
   );
 }
