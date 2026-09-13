@@ -1,1 +1,5 @@
-{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
+{
+  "rewrites": [
+    { "source": "/((?!ConsortiaValuationBuilder\\.html$).*)", "destination": "/index.html" }
+  ]
+}

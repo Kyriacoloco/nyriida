@@ -773,7 +773,6 @@ function EngagementDetail() {
           <p>{e.client_name}{e.client_title ? `, ${e.client_title}` : ""} · {e.client_email}</p>
         </div>
         <div className="row">
-          <a className="btn" href="/app/valuation-builder" target="_blank" rel="noreferrer">Valuation Builder</a>
           <a className="btn" href={`${PORTAL_URL}?as=${e.id}`} target="_blank" rel="noreferrer">Preview client's page</a>
           <Chip kind={e.stage === "declined" ? "danger" : e.stage === "completed" ? "ok" : "brand"}>{stageLabel(e.stage)}</Chip>
         </div>
@@ -1052,7 +1051,7 @@ function ShareDocCard({ e, docs, reload }) {
         <div>
           <h3 style={{ marginBottom: 6 }}>From Consortia (client can see)</h3>
           <div className="stack" style={{ gap: 6 }}>
-            {shared.length === 0 && <span className="muted small">Nothing yet. Upload the Valuation Builder PDF here.</span>}
+            {shared.length === 0 && <span className="muted small">Nothing yet.</span>}
             {shared.map((d) => <div key={d.id} className="row between small"><span>{d.name}<div className="muted">{ago(d.created_at)}</div></span><button className="btn" onClick={() => open(d.storage_path)}>Open</button></div>)}
             <div className="row">
               <input value={label} onChange={(x) => setLabel(x.target.value)} placeholder="Name shown to the client" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)" }} />
@@ -1209,23 +1208,78 @@ function NotesCard({ e, contact, reload }) {
   const [run, busy] = useAction();
   const [edit, setEdit] = useState(false);
   const [notes, setNotes] = useState(e.staff_notes ?? "");
+  const [recs, setRecs] = useState([]);
+  const [fathom, setFathom] = useState(""); const [callNo, setCallNo] = useState(1);
+  const [vb, setVb] = useState([]);
+  const load = useCallback(async () => {
+    if (e.opportunity_id) { const { data } = await supabase.from("call_recordings").select("*").eq("opportunity_id", e.opportunity_id).order("call_no"); setRecs(data ?? []); }
+    const { data: d } = await supabase.from("documents").select("*").eq("engagement_id", e.id).eq("kind", "six_page_review").order("created_at", { ascending: false });
+    setVb(d ?? []);
+  }, [e.id, e.opportunity_id]);
+  useEffect(() => { load(); }, [load]);
+  const open = async (path) => window.open(await signedUrl(path), "_blank");
   const save = () => run(async () => {
     const { error } = await supabase.from("engagements").update({ staff_notes: notes }).eq("id", e.id);
     if (error) throw new Error(error.message);
     await reload(); setEdit(false);
   }, "Notes saved");
+  const addFathom = () => run(async () => {
+    const { error } = await supabase.from("call_recordings").insert({ opportunity_id: e.opportunity_id, call_no: callNo, fathom_url: fathom, recorded_at: new Date().toISOString() });
+    if (error) throw new Error(error.message);
+    setFathom(""); await load();
+  }, "Recording attached");
+  async function uploadVb(file) {
+    await run(async () => {
+      const path = `${e.id}/${Date.now()}-${file.name}`;
+      const { error } = await supabase.storage.from("deliverables").upload(path, file);
+      if (error) throw new Error(error.message);
+      const { error: e2 } = await supabase.from("documents").insert({ engagement_id: e.id, kind: "six_page_review", name: "Valuation Builder snapshot", storage_path: `deliverables/${path}`, visibility: "client", uploaded_by: "staff" });
+      if (e2) throw new Error(e2.message);
+      await load();
+    }, "Valuation Builder PDF attached and visible to the client");
+  }
   return (
-    <Card title="What they told us" right={<button className="btn" onClick={() => setEdit(!edit)}>{edit ? "Cancel" : "Edit notes"}</button>}>
-      {contact?.custom && Object.keys(contact.custom).length > 0 && <Intake custom={contact.custom} title="From the intake form" />}
-      <h3 style={{ margin: "6px 0" }}>Notes (calls, objections, anything useful)</h3>
-      {edit ? (
-        <div className="stack">
-          <textarea rows={6} value={notes} onChange={(x) => setNotes(x.target.value)} placeholder="e.g. Wants to sell in 2 years. Worried about key-person risk. Prefers calls on Thursdays." style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--border)", font: "inherit" }} />
-          <div><button className="btn primary" disabled={busy} onClick={save}>Save notes</button></div>
+    <Card title="Lead information" right={<button className="btn" onClick={() => setEdit(!edit)}>{edit ? "Cancel" : "Edit notes"}</button>}>
+      <div className="stack" style={{ gap: 14 }}>
+        {contact?.custom && Object.keys(contact.custom).length > 0 && <div><Intake custom={contact.custom} title="From the intake form" /></div>}
+
+        <div>
+          <h3 style={{ marginBottom: 6 }}>Valuation Builder</h3>
+          <div className="stack" style={{ gap: 6 }}>
+            {vb.map((d) => <div key={d.id} className="row between small"><span>{d.name}<div className="muted">{ago(d.created_at)} · visible to the client</div></span><button className="btn" onClick={() => open(d.storage_path)}>Open</button></div>)}
+            <div className="row">
+              <a className="btn" href="/app/valuation-builder" target="_blank" rel="noreferrer">Open Valuation Builder</a>
+              <label className="btn" style={{ cursor: "pointer" }}>{busy ? "Uploading…" : "Attach the PDF from the call"}<input type="file" accept=".pdf" style={{ display: "none" }} onChange={(x) => x.target.files[0] && uploadVb(x.target.files[0])} /></label>
+            </div>
+          </div>
         </div>
-      ) : (
-        <div className="small" style={{ whiteSpace: "pre-wrap" }}>{e.staff_notes || <span className="muted">No notes yet.</span>}</div>
-      )}
+
+        <div>
+          <h3 style={{ marginBottom: 6 }}>Call recordings (Fathom)</h3>
+          <div className="stack" style={{ gap: 6 }}>
+            {recs.map((r) => <div key={r.id} className="row between small"><span>Call {r.call_no}{r.recorded_at && <span className="muted"> · {day(r.recorded_at)}</span>}</span><a className="btn" href={r.fathom_url} target="_blank" rel="noreferrer">Open in Fathom</a></div>)}
+            {e.opportunity_id ? (
+              <div className="row">
+                <select value={callNo} onChange={(x) => setCallNo(Number(x.target.value))} style={{ padding: 8, borderRadius: 8, border: "1px solid var(--border)" }}><option value={1}>Call 1</option><option value={2}>Call 2</option></select>
+                <input placeholder="https://fathom.video/…" value={fathom} onChange={(x) => setFathom(x.target.value)} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)" }} />
+                <button className="btn" disabled={!fathom || busy} onClick={addFathom}>Attach</button>
+              </div>
+            ) : <span className="muted small">No GHL lead linked, so no recordings.</span>}
+          </div>
+        </div>
+
+        <div>
+          <h3 style={{ marginBottom: 6 }}>Notes (calls, objections, anything useful)</h3>
+          {edit ? (
+            <div className="stack">
+              <textarea rows={6} value={notes} onChange={(x) => setNotes(x.target.value)} placeholder="e.g. Wants to sell in 2 years. Worried about key-person risk." style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--border)", font: "inherit" }} />
+              <div><button className="btn primary" disabled={busy} onClick={save}>Save notes</button></div>
+            </div>
+          ) : (
+            <div className="small" style={{ whiteSpace: "pre-wrap" }}>{e.staff_notes || <span className="muted">No notes yet.</span>}</div>
+          )}
+        </div>
+      </div>
     </Card>
   );
 }
@@ -1240,6 +1294,7 @@ function Invoices({ invoices, reload }) {
   }, "Marked paid, receipt emailed");
   const open = async (path) => window.open(await signedUrl(path), "_blank");
   const receipt = (id) => run(() => callFn("engagement-send", { kind: "receipt", invoice_id: id }).then(reload), "Receipt created and emailed");
+  const makePdf = (id) => run(() => callFn("engagement-send", { kind: "invoice_pdf", invoice_id: id }).then(reload), "Invoice PDF created and emailed");
   const kind = (s) => ({ paid: "ok", issued: "warn", refunded: "", void: "", scheduled: "" })[s];
   return (
     <Card title="Invoices">
@@ -1256,6 +1311,7 @@ function Invoices({ invoices, reload }) {
                 <td style={{ textAlign: "right" }}>
                   <span className="row" style={{ justifyContent: "flex-end" }}>
                     {i.pdf_path && <button className="btn" onClick={() => open(i.pdf_path)}>PDF</button>}
+                    {!i.pdf_path && i.invoice_no && <button className="btn" disabled={busy} onClick={() => makePdf(i.id)}>Create PDF</button>}
                     {i.receipt_path && <button className="btn" onClick={() => open(i.receipt_path)}>Receipt</button>}
                     {i.status === "paid" && !i.receipt_path && <button className="btn" disabled={busy} onClick={() => receipt(i.id)}>Create receipt</button>}
                     {i.status === "issued" && i.seq > 0 ? <button className="btn" disabled={busy} onClick={() => paid(i.id)}>Mark paid</button> : <Chip kind={kind(i.status)}>{i.status}</Chip>}
@@ -1492,7 +1548,8 @@ function Portal({ session }) {
   const load = useCallback(async () => {
     let eng = null;
     if (previewId) {
-      const { data } = await supabase.from("engagements").select("*").eq("id", previewId).maybeSingle();   // staff RLS
+      const { data, error } = await supabase.from("engagements").select("*").eq("id", previewId).maybeSingle();   // staff RLS
+      if (error) console.error("preview", error.message);
       eng = data;
     } else {
       const { data: raw } = await supabase.rpc("portal_my_engagement");
@@ -1524,7 +1581,7 @@ function Portal({ session }) {
   if (e === null) return (
     <div className="login"><div className="box">
       <h1>No engagement found</h1>
-      <p>You're signed in as <strong>{session.user.email}</strong>, and that address isn't linked to an engagement. Sign out and use the email address we wrote to, or contact info@consortiaadvisory.com.</p>
+      <p>{previewId ? "Preview failed: you must be signed in to Solonos as staff in this same browser to preview a client's page." : <>You're signed in as <strong>{session.user.email}</strong>, and that address isn't linked to an engagement. Sign out and use the email address we wrote to, or contact info@consortiaadvisory.com.</>}</p>
       <button className="btn primary" onClick={() => logout("/portal")}>Try another email</button>
     </div></div>
   );
