@@ -196,7 +196,7 @@ const ago = (d) => {
 const url = SUPABASE_URL;
 const key = SUPABASE_ANON_KEY;
 const configured = Boolean(url && key);
-const supabase = configured ? createClient(url, key) : null;
+const supabase = configured ? createClient(url, key, { auth: { flowType: "implicit", detectSessionInUrl: true } }) : null;
 
 /** Call a Postgres function and turn its error into a plain message the UI can show. */
 async function rpc(fn, args) {
@@ -286,6 +286,13 @@ function Login() {
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState("password");   // password | link
   const [sent, setSent] = useState(false);
+  const [code, setCode] = useState("");
+  async function verify(e) {
+    e.preventDefault(); setBusy(true); setErr("");
+    const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: "email" });
+    setBusy(false);
+    if (error) setErr("That code didn't work.");
+  }
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -305,10 +312,15 @@ function Login() {
 
   return (
     <div className="login">
-      <form className="box" onSubmit={submit}>
+      <form className="box" onSubmit={sent ? verify : submit}>
         <h1>Solonos</h1>
         {sent ? (
-          <p>Check {email} for a sign-in link. Once inside, set a password from the bottom of the left menu.</p>
+          <>
+            <p>Check {email}: click the link, or type the 6-digit code here. Once inside, set a password from the bottom of the left menu.</p>
+            <input inputMode="numeric" maxLength={6} placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} style={{ letterSpacing: 6, fontSize: 20, textAlign: "center" }} />
+            {err && <p className="err">{err}</p>}
+            <button className="btn primary" disabled={busy || code.trim().length < 6}>{busy ? "Checking…" : "Sign in"}</button>
+          </>
         ) : (
           <>
             <p>{mode === "password" ? "Sign in with your email and password." : "No password yet? Get a one-time link by email."}</p>
@@ -1157,6 +1169,7 @@ const PORTAL_STEPS = [
 
 function PortalLogin() {
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1166,16 +1179,30 @@ function PortalLogin() {
     setBusy(false);
     if (error) setErr(error.message); else setSent(true);
   }
+  async function verify(e) {
+    e.preventDefault(); setBusy(true); setErr("");
+    const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: "email" });
+    setBusy(false);
+    if (error) setErr("That code didn't work. Check the digits or request a new email.");
+  }
   return (
     <div className="login">
-      <form className="box" onSubmit={send}>
+      <form className="box" onSubmit={sent ? verify : send}>
         <h1>Consortia Advisory</h1>
-        {sent ? <p>Check {email} for your sign-in link. It opens your page directly.</p> : (
+        {sent ? (
           <>
-            <p>Your private page for the valuation engagement. Enter the email address we wrote to and we'll send you a one-time link.</p>
+            <p>We've emailed {email}. Either click the button in the email, or type the 6-digit code from it here.</p>
+            <input inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} style={{ letterSpacing: 6, fontSize: 20, textAlign: "center" }} />
+            {err && <p className="err">{err}</p>}
+            <button className="btn primary" disabled={busy || code.trim().length < 6}>{busy ? "Checking…" : "Open my page"}</button>
+            <p style={{ marginTop: 12, fontSize: 13 }}><a href="#" style={{ color: "var(--on)", opacity: .85 }} onClick={(x) => { x.preventDefault(); setSent(false); setCode(""); }}>Use a different email</a></p>
+          </>
+        ) : (
+          <>
+            <p>Your private page for the valuation engagement. Enter the email address we wrote to.</p>
             <input type="email" required placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
             {err && <p className="err">{err}</p>}
-            <button className="btn primary" disabled={busy}>{busy ? "Sending…" : "Send me the link"}</button>
+            <button className="btn primary" disabled={busy}>{busy ? "Sending…" : "Send me the link and code"}</button>
           </>
         )}
       </form>
