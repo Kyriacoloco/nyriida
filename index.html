@@ -1584,6 +1584,7 @@ function Portal({ session }) {
   const [invoices, setInvoices] = useState([]);
   const [shared, setShared] = useState([]);
   const [feed, setFeed] = useState([]);
+  const [project, setProject] = useState(null);
   const [step, setStep] = useState(null);
 
   const previewId = new URLSearchParams(window.location.search).get("as");
@@ -1621,6 +1622,7 @@ function Portal({ session }) {
   useEffect(() => { load(); }, [load]);
 
   if (e === undefined) return null;
+  if (e === null && !previewId) return <PortalNoEngagement session={session} />;
   if (e === null) return (
     <div className="login"><div className="box">
       <h1>No engagement found</h1>
@@ -1684,6 +1686,37 @@ function Portal({ session }) {
         {current === "invoices" && <FilesStep e={e} invoices={invoices} shared={shared} feed={feed} docs={docs} project={project} overview={overviewMode} />}
       </main>
     </div>
+  );
+}
+
+/** Signed in on /portal but no engagement matches: a client typed the wrong email, or staff landed here. */
+function PortalNoEngagement({ session }) {
+  const [isStaff, setIsStaff] = useState(null);
+  const [engs, setEngs] = useState([]);
+  useEffect(() => {
+    supabase.rpc("is_staff").then(async ({ data }) => {
+      setIsStaff(!!data);
+      if (data) { const { data: rows } = await supabase.from("engagements").select("id, client_name, company_name, stage").order("updated_at", { ascending: false }); setEngs(rows ?? []); }
+    });
+  }, []);
+  if (isStaff === null) return null;
+  if (isStaff) return (
+    <div className="login"><div className="box" style={{ width: 460 }}>
+      <h1>Staff preview</h1>
+      <p>You're signed in as staff ({session.user.email}). Clients see this page under their own email. Pick an engagement to see it as that client:</p>
+      <select onChange={(x) => x.target.value && (window.location.href = `/portal?as=${x.target.value}`)} style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid rgba(255,255,255,.4)", background: "rgba(255,255,255,.1)", color: "var(--on)" }}>
+        <option value="">Choose a client…</option>
+        {engs.map((g) => <option key={g.id} value={g.id} style={{ color: "#222" }}>{g.company_name || g.client_name} · {stageLabel(g.stage)}</option>)}
+      </select>
+      <p style={{ marginTop: 14, fontSize: 13 }}><a href="/app/engagements" style={{ color: "var(--on)" }}>Back to Solonos</a></p>
+    </div></div>
+  );
+  return (
+    <div className="login"><div className="box">
+      <h1>No engagement found</h1>
+      <p>You're signed in as <strong>{session.user.email}</strong>, and that address isn't linked to an engagement. Sign out and use the email address we wrote to, or contact info@consortiaadvisory.com.</p>
+      <button className="btn primary" onClick={() => logout("/portal")}>Try another email</button>
+    </div></div>
   );
 }
 
