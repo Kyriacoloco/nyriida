@@ -492,6 +492,47 @@ function Intake({ custom, title = "Intake form" }) {
   );
 }
 
+/** Valuation Builder PDFs attached to a lead; they follow the lead into its engagement. */
+function LeadBuilders({ lead, reload }) {
+  const [run, busy] = useAction();
+  const [docs, setDocs] = useState([]);
+  const load = useCallback(async () => {
+    const { data } = await supabase.from("documents").select("*").eq("opportunity_id", lead.ghl_id).eq("kind", "valuation_builder").order("created_at", { ascending: false });
+    setDocs(data ?? []);
+  }, [lead.ghl_id]);
+  useEffect(() => { load(); }, [load]);
+  const open = async (path) => window.open(await signedUrl(path), "_blank");
+  async function upload(file) {
+    await run(async () => {
+      const path = `leads/${lead.ghl_id}/${Date.now()}-${file.name}`;
+      const { error } = await supabase.storage.from("deliverables").upload(path, file);
+      if (error) throw new Error(error.message);
+      const { error: e2 } = await supabase.from("documents").insert({ opportunity_id: lead.ghl_id, kind: "valuation_builder", name: `Valuation Builder - ${day(new Date())}`, storage_path: `deliverables/${path}`, visibility: "internal", uploaded_by: "staff" });
+      if (e2) throw new Error(e2.message);
+      await load(); await reload?.();
+    }, "Valuation Builder saved on this lead");
+  }
+  const remove = (d) => run(async () => {
+    await supabase.storage.from("deliverables").remove([d.storage_path.replace(/^deliverables\//, "")]);
+    const { error } = await supabase.from("documents").delete().eq("id", d.id);
+    if (error) throw new Error(error.message);
+    await load(); await reload?.();
+  }, "Removed");
+  return (
+    <>
+      <h3>Valuation Builder</h3>
+      <div className="stack" style={{ margin: "8px 0 18px", gap: 6 }}>
+        {docs.length === 0 && <span className="muted small">None sent yet. Build it during the call, save the PDF, attach it here. It moves with the lead into the engagement and the client sees it on their page.</span>}
+        {docs.map((d) => <div key={d.id} className="row between small"><span>{d.name}<div className="muted">{ago(d.created_at)}</div></span><span className="row"><button className="btn" onClick={() => open(d.storage_path)}>Open</button><button className="btn" disabled={busy} onClick={() => remove(d)}>Remove</button></span></div>)}
+        <div className="row">
+          <a className="btn" href="/app/valuation-builder" target="_blank" rel="noreferrer">Open Valuation Builder</a>
+          <label className="btn primary" style={{ cursor: "pointer" }}>{busy ? "Uploading…" : "Attach PDF"}<input type="file" accept=".pdf" style={{ display: "none" }} disabled={busy} onChange={(x) => x.target.files[0] && upload(x.target.files[0])} /></label>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function LeadCard({ l, eng, onOpen }) {
   return (
     <div className="lead" onClick={onOpen}>
@@ -504,6 +545,7 @@ function LeadCard({ l, eng, onOpen }) {
         {l.country && <Chip>{l.country}</Chip>}
         {l.monetary_value > 0 && <Chip>{eur(l.monetary_value)}</Chip>}
         {l.recordings > 0 && <Chip>Fathom ×{l.recordings}</Chip>}
+        {l.builders > 0 && <Chip kind="brand">Builder sent</Chip>}
         {eng && <Chip kind={eng.stage === "declined" ? "danger" : "accent"}>{stageLabel(eng.stage)}</Chip>}
       </div>
     </div>
@@ -647,7 +689,7 @@ function LeadDrawer({ lead, engagement, onClose, reload }) {
       </dl>
 
       <Intake custom={lead.custom} />
-      <div style={{ marginBottom: 18 }}><a className="btn" href="/app/valuation-builder" target="_blank" rel="noreferrer">Open Valuation Builder</a></div>
+      <LeadBuilders lead={lead} reload={reload} />
 
       <h3>Call recordings</h3>
       <div className="stack" style={{ margin: "8px 0 18px" }}>
@@ -1213,7 +1255,7 @@ function NotesCard({ e, contact, reload }) {
   const [vb, setVb] = useState([]);
   const load = useCallback(async () => {
     if (e.opportunity_id) { const { data } = await supabase.from("call_recordings").select("*").eq("opportunity_id", e.opportunity_id).order("call_no"); setRecs(data ?? []); }
-    const { data: d } = await supabase.from("documents").select("*").eq("engagement_id", e.id).eq("kind", "six_page_review").order("created_at", { ascending: false });
+    const { data: d } = await supabase.from("documents").select("*").eq("engagement_id", e.id).in("kind", ["valuation_builder", "six_page_review"]).order("created_at", { ascending: false });
     setVb(d ?? []);
   }, [e.id, e.opportunity_id]);
   useEffect(() => { load(); }, [load]);
@@ -1233,7 +1275,7 @@ function NotesCard({ e, contact, reload }) {
       const path = `${e.id}/${Date.now()}-${file.name}`;
       const { error } = await supabase.storage.from("deliverables").upload(path, file);
       if (error) throw new Error(error.message);
-      const { error: e2 } = await supabase.from("documents").insert({ engagement_id: e.id, kind: "six_page_review", name: "Valuation Builder snapshot", storage_path: `deliverables/${path}`, visibility: "client", uploaded_by: "staff" });
+      const { error: e2 } = await supabase.from("documents").insert({ engagement_id: e.id, opportunity_id: e.opportunity_id ?? null, kind: "valuation_builder", name: `Valuation Builder - ${day(new Date())}`, storage_path: `deliverables/${path}`, visibility: "client", uploaded_by: "staff" });
       if (e2) throw new Error(e2.message);
       await load();
     }, "Valuation Builder PDF attached and visible to the client");
@@ -1246,7 +1288,8 @@ function NotesCard({ e, contact, reload }) {
         <div>
           <h3 style={{ marginBottom: 6 }}>Valuation Builder</h3>
           <div className="stack" style={{ gap: 6 }}>
-            {vb.map((d) => <div key={d.id} className="row between small"><span>{d.name}<div className="muted">{ago(d.created_at)} · visible to the client</div></span><button className="btn" onClick={() => open(d.storage_path)}>Open</button></div>)}
+            {vb.length === 0 && <span className="muted small">No Valuation Builder attached on the lead. Attach one here; the client sees it on their page.</span>}
+            {vb.map((d) => <div key={d.id} className="row between small"><span>{d.name}<div className="muted">{d.opportunity_id ? "from the lead · " : ""}{ago(d.created_at)} · visible to the client</div></span><button className="btn" onClick={() => open(d.storage_path)}>Open</button></div>)}
             <div className="row">
               <a className="btn" href="/app/valuation-builder" target="_blank" rel="noreferrer">Open Valuation Builder</a>
               <label className="btn" style={{ cursor: "pointer" }}>{busy ? "Uploading…" : "Attach the PDF from the call"}<input type="file" accept=".pdf" style={{ display: "none" }} onChange={(x) => x.target.files[0] && uploadVb(x.target.files[0])} /></label>
