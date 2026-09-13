@@ -775,7 +775,7 @@ function EngagementDetail() {
           <NextStep e={e} st={st} deposit={deposit} docs={docs} invoices={invoices} agreements={agreements} reload={load} />
           {!["declined"].includes(e.stage) && <LetterCard e={e} reload={load} agreements={agreements} />}
           <Checklist e={e} docs={docs} reload={load} />
-          <ShareDocCard e={e} reload={load} />
+          <ShareDocCard e={e} docs={docs} reload={load} />
           {canDecline && <DeclineBox e={e} reload={load} />}
         </div>
         <div className="stack" style={{ gap: 16 }}>
@@ -885,7 +885,12 @@ function SendNdaStep({ e, agreements, reload }) {
 function DepositCard({ e, deposit, reload }) {
   const [run, busy] = useAction();
   const [ref, setRef] = useState("");
-  const paid = () => run(() => rpc("staff_mark_deposit_paid", { p_engagement: e.id, p_reference: ref || null }).then(reload), "Deposit marked paid");
+  const paid = () => run(async () => {
+    await rpc("staff_mark_deposit_paid", { p_engagement: e.id, p_reference: ref || null });
+    const { data: inv } = await supabase.from("engagement_invoices").select("id").eq("engagement_id", e.id).eq("seq", 0).maybeSingle();
+    if (inv) await callFn("engagement-send", { kind: "receipt", invoice_id: inv.id });
+    await reload();
+  }, "Deposit marked paid, receipt emailed");
   const kind = { pending: "warn", claimed: "accent", paid: "ok", credited: "ok", kept: "", refunded: "" }[deposit?.status] ?? "";
   return (
     <Card title="€1,000 deposit" right={deposit && <Chip kind={kind}>{deposit.status === "claimed" ? "client says paid" : deposit.status}</Chip>}>
@@ -949,8 +954,14 @@ function LetterCard({ e, reload, agreements }) {
   const [fee, setFee] = useState(e.fee ?? "");
   const [appr, setAppr] = useState(e.approaches ?? []);
   const toggle = (k) => setAppr((a) => (a.includes(k) ? a.filter((x) => x !== k) : [...a, k]));
-  const letter = agreements.filter((a) => a.kind === "engagement_letter" && a.status !== "void").at(-1);
+  const letters = agreements.filter((a) => a.kind === "engagement_letter" && a.status !== "void");
+  const draft = letters.find((a) => a.status === "draft");
+  const live = letters.find((a) => a.status === "sent" || a.status === "signed");
   const locked = ["engaged", "valuation_active", "completed", "declined"].includes(e.stage);
+  const saved = e.fee && Number(e.fee) === Number(fee) && JSON.stringify(e.approaches ?? []) === JSON.stringify(appr);
+  const canDraft = saved && !!e.company_confirmed_at;
+  const autoRan = React.useRef(false);
+
   async function save() {
     await run(async () => {
       const { error } = await supabase.from("engagements").update({ fee: Number(fee), approaches: appr }).eq("id", e.id);
@@ -958,13 +969,23 @@ function LetterCard({ e, reload, agreements }) {
       await reload();
     }, "Terms saved");
   }
+  const makeDraft = () => run(() => callFn("engagement-send", { engagement_id: e.id, kind: "letter_draft" }).then(reload), "Draft created for your review");
   const send = () => run(() => callFn("engagement-send", { engagement_id: e.id, kind: "letter" }).then(reload), "Engagement letter sent");
+  const open = async (path) => window.open(await signedUrl(path), "_blank");
+
+  // the draft appears on its own once the fee is saved and the client has confirmed their details
+  useEffect(() => {
+    if (!locked && canDraft && !draft && !live && !autoRan.current) { autoRan.current = true; makeDraft(); }
+  }, [canDraft, draft, live, locked]);
+
   const half = Math.min(Number(fee || 0) * 0.5, 5000);
-  const saved = e.fee && Number(e.fee) === Number(fee) && JSON.stringify(e.approaches ?? []) === JSON.stringify(appr);
   return (
-    <Card title="Engagement letter" right={letter && <Chip kind={letter.status === "signed" ? "ok" : "warn"}>v{letter.version} {letter.status}</Chip>}>
+    <Card title="Engagement letter" right={(live ?? draft) && <Chip kind={live?.status === "signed" ? "ok" : "warn"}>v{(live ?? draft).version} {(live ?? draft).status}</Chip>}>
       {locked ? (
-        <span className="small">{letter ? `Signed ${day(letter.signed_at)}. Fee ${eur(e.fee)}.` : "—"}</span>
+        <div className="row wrap">
+          <span className="small">{live ? `Signed ${day(live.signed_at)}. Fee ${eur(e.fee)}.` : "—"}</span>
+          {live?.signed_pdf_path && <button className="btn" onClick={() => open(live.signed_pdf_path)}>Open signed PDF</button>}
+        </div>
       ) : (
         <div className="stack">
           <div className="grid2">
@@ -978,26 +999,45 @@ function LetterCard({ e, reload, agreements }) {
               <label key={a.key} className="check"><input type="checkbox" checked={appr.includes(a.key)} onChange={() => toggle(a.key)} />{a.label}</label>
             ))}
           </div>
-          <div className="row">
-            <button className="btn" disabled={busy || !fee || appr.length === 0 || saved} onClick={save}>{saved ? "Terms saved" : "Save terms"}</button>
-            <button className="btn primary" disabled={busy || !saved} onClick={send}>{letter ? "Resend letter" : "Send engagement letter"}</button>
-            {letter && <span className="muted small">sent {day(letter.sent_at)}</span>}
-          </div>
+          <div className="row"><button className="btn" disabled={busy || !fee || appr.length === 0 || saved} onClick={save}>{saved ? "Terms saved" : "Save terms"}</button></div>
+
+          {live ? (
+            <div className="note">
+              Letter v{live.version} sent {day(live.sent_at)}{live.status === "signed" && `, signed ${day(live.signed_at)}`}.
+              {live.pdf_path && <> <button className="btn link" onClick={() => open(live.signed_pdf_path ?? live.pdf_path)}>Open PDF</button></>}
+            </div>
+          ) : draft ? (
+            <div className="card" style={{ padding: 14, borderColor: "var(--accent)" }}>
+              <div className="row between wrap">
+                <div><strong>Draft v{draft.version} ready for your review.</strong><div className="muted small">Your signature is already on it. Check it, then approve.</div></div>
+                <div className="row">
+                  {draft.pdf_path && <button className="btn" onClick={() => open(draft.pdf_path)}>Open draft PDF</button>}
+                  <button className="btn" disabled={busy} onClick={makeDraft} title="Regenerate with the current fee and details">Redo draft</button>
+                  <button className="btn primary" disabled={busy} onClick={send}>Approve and send to client</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="muted small">
+              {!saved ? "Save the terms; " : ""}{!e.company_confirmed_at ? "the client hasn't confirmed their company details yet; " : ""}the draft letter appears here for your review as soon as both are done.
+            </div>
+          )}
         </div>
       )}
     </Card>
   );
 }
 
-function ShareDocCard({ e, reload }) {
+function ShareDocCard({ e, docs, reload }) {
   const [run, busy] = useAction();
-  const [docs, setDocs] = useState([]);
+  const [shared, setShared] = useState([]);
   const [label, setLabel] = useState("Valuation snapshot");
   const load = useCallback(async () => {
-    const { data } = await supabase.from("documents").select("*").eq("engagement_id", e.id).eq("visibility", "client").neq("kind", "invoice").order("created_at", { ascending: false });
-    setDocs(data ?? []);
+    const { data } = await supabase.from("documents").select("*").eq("engagement_id", e.id).eq("visibility", "client").order("created_at", { ascending: false });
+    setShared(data ?? []);
   }, [e.id]);
   useEffect(() => { load(); }, [load]);
+  const open = async (path) => window.open(await signedUrl(path), "_blank");
   async function upload(file) {
     await run(async () => {
       const path = `${e.id}/${Date.now()}-${file.name}`;
@@ -1008,14 +1048,29 @@ function ShareDocCard({ e, reload }) {
       await load();
     }, "Shared with the client");
   }
+  const fromClient = docs.filter((d) => d.uploaded_at);
   return (
-    <Card title="Shared with the client">
-      <div className="stack" style={{ gap: 6 }}>
-        {docs.map((d) => <div key={d.id} className="row between small"><span>{d.name}</span><span className="muted">{ago(d.created_at)}</span></div>)}
-        {docs.length === 0 && <span className="muted small">Nothing yet. Upload the Valuation Builder PDF here and the client sees it on their page.</span>}
-        <div className="row">
-          <input value={label} onChange={(x) => setLabel(x.target.value)} placeholder="Name shown to the client" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)" }} />
-          <label className="btn" style={{ cursor: "pointer" }}>{busy ? "Uploading…" : "Upload file"}<input type="file" style={{ display: "none" }} onChange={(x) => x.target.files[0] && upload(x.target.files[0])} /></label>
+    <Card title="Shared files" right={<span className="muted small">both directions</span>}>
+      <div className="grid2">
+        <div>
+          <h3 style={{ marginBottom: 6 }}>From the client</h3>
+          <div className="stack" style={{ gap: 6 }}>
+            {fromClient.length === 0 && <span className="muted small">Nothing uploaded yet.</span>}
+            {fromClient.map((d) => (
+              <div key={d.id} className="row between small"><span>{d.label}<div className="muted">{fileNameOf(d.storage_path)} · {day(d.uploaded_at)}</div></span><button className="btn" onClick={() => open(d.storage_path)}>Open</button></div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h3 style={{ marginBottom: 6 }}>From Consortia (client can see)</h3>
+          <div className="stack" style={{ gap: 6 }}>
+            {shared.length === 0 && <span className="muted small">Nothing yet. Upload the Valuation Builder PDF here.</span>}
+            {shared.map((d) => <div key={d.id} className="row between small"><span>{d.name}<div className="muted">{ago(d.created_at)}</div></span><button className="btn" onClick={() => open(d.storage_path)}>Open</button></div>)}
+            <div className="row">
+              <input value={label} onChange={(x) => setLabel(x.target.value)} placeholder="Name shown to the client" style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)" }} />
+              <label className="btn" style={{ cursor: "pointer" }}>{busy ? "Uploading…" : "Upload"}<input type="file" style={{ display: "none" }} onChange={(x) => x.target.files[0] && upload(x.target.files[0])} /></label>
+            </div>
+          </div>
         </div>
       </div>
     </Card>
@@ -1056,7 +1111,7 @@ function Checklist({ e, docs, reload }) {
           <div key={d.id} className="row between small" style={{ padding: "6px 0", borderBottom: "1px solid var(--border-sub)" }}>
             <span>{d.uploaded_at ? "✓ " : "○ "}{d.label} {!d.required && <Chip>optional</Chip>}</span>
             <span className="row">
-              {d.uploaded_at ? <span className="muted">{ago(d.uploaded_at)}{d.uploaded_by?.startsWith("staff:") && " · by staff"}</span> : (
+              {d.uploaded_at ? <span className="row"><span className="muted">{ago(d.uploaded_at)}{d.uploaded_by?.startsWith("staff:") && " · by staff"}</span>{d.storage_path && <button className="btn" onClick={async () => window.open(await signedUrl(d.storage_path), "_blank")}>Open</button>}</span> : (
                 <>
                   <button className="btn" disabled={busy} onClick={() => received(d.id)} title="Client sent it another way">Mark received</button>
                   {!locked && <button className="btn" disabled={busy} onClick={() => remove(d.id)}>Remove</button>}
@@ -1155,6 +1210,7 @@ function ClientDetails({ e, reload }) {
         <dt>Invoiced by</dt><dd>{entityFor(e.company_country)}</dd>
       </dl>
       {missing.length > 0 && <div className="note" style={{ marginTop: 10 }}>The NDA needs {missing.join(", ")}. Fill it in before sending.</div>}
+      <div className="muted small" style={{ marginTop: 10 }}>{e.company_confirmed_at ? `✓ Confirmed by the client ${ago(e.company_confirmed_at)}` : "Not yet confirmed by the client on the portal"}</div>
     </Card>
   );
 }
@@ -1164,7 +1220,12 @@ const entityFor = (c = "") => ["gb", "uk", "gbr", "united kingdom", "great brita
 /* ---------------------------------------------------------------- invoices */
 function Invoices({ invoices, reload }) {
   const [run, busy] = useAction();
-  const paid = (id) => run(() => rpc("staff_mark_invoice_paid", { p_invoice: id }).then(reload), "Marked paid");
+  const paid = (id) => run(async () => {
+    await rpc("staff_mark_invoice_paid", { p_invoice: id });
+    await callFn("engagement-send", { kind: "receipt", invoice_id: id });
+    await reload();
+  }, "Marked paid, receipt emailed");
+  const open = async (path) => window.open(await signedUrl(path), "_blank");
   const kind = (s) => ({ paid: "ok", issued: "warn", refunded: "", void: "", scheduled: "" })[s];
   return (
     <Card title="Invoices">
@@ -1179,7 +1240,11 @@ function Invoices({ invoices, reload }) {
                 </td>
                 <td style={{ textAlign: "right" }}>{money(i.amount, i.currency)}</td>
                 <td style={{ textAlign: "right" }}>
-                  {i.status === "issued" && i.seq > 0 ? <button className="btn" disabled={busy} onClick={() => paid(i.id)}>Mark paid</button> : <Chip kind={kind(i.status)}>{i.status}</Chip>}
+                  <span className="row" style={{ justifyContent: "flex-end" }}>
+                    {i.pdf_path && <button className="btn" onClick={() => open(i.pdf_path)}>PDF</button>}
+                    {i.receipt_path && <button className="btn" onClick={() => open(i.receipt_path)}>Receipt</button>}
+                    {i.status === "issued" && i.seq > 0 ? <button className="btn" disabled={busy} onClick={() => paid(i.id)}>Mark paid</button> : <Chip kind={kind(i.status)}>{i.status}</Chip>}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -1202,6 +1267,8 @@ function describe(f) {
     case "letter.sent": return `Engagement letter v${d.version} emailed (fee ${eur(d.fee)})`;
     case "deposit.claimed": return `Client says the deposit is paid${d.reference ? ` (ref ${d.reference})` : ""}`;
     case "client.company_updated": return "Client updated their company details";
+    case "client.company_confirmed": return "Client confirmed their company details";
+    case "letter.drafted": return `Engagement letter draft v${d.version} created for review (fee ${eur(d.fee)})`;
     case "client.uploaded": return `Client uploaded: ${d.label}`;
     case "deposit.paid": return `Deposit received by ${d.method === "bank_transfer" ? "bank transfer" : "card"}${d.reference ? ` (${d.reference})` : ""}`;
     case "invoice.issued": return `${INVOICE_NAMES[d.seq]} issued, #${d.no}, ${eur(d.amount)}`;
@@ -1323,8 +1390,9 @@ function DocxView({ storagePath }) {
 /** Shows the PDF when we have one (converted by Word), otherwise renders the .docx. */
 function AgreementView({ agreement }) {
   const [url, setUrl] = useState(null);
-  useEffect(() => { if (agreement.pdf_path) signedUrl(agreement.pdf_path, 3600).then(setUrl).catch(() => setUrl(null)); }, [agreement.pdf_path]);
-  if (agreement.pdf_path) return url ? <iframe title="document" src={url} style={{ width: "100%", height: "70vh", border: "1px solid var(--border)", borderRadius: 12, background: "#fff" }} /> : <div className="muted small">Loading the document…</div>;
+  const path = agreement.signed_pdf_path ?? agreement.pdf_path;
+  useEffect(() => { setUrl(null); if (path) signedUrl(path, 3600).then(setUrl).catch(() => setUrl(null)); }, [path]);
+  if (path) return url ? <iframe title="document" src={url} style={{ width: "100%", height: "70vh", border: "1px solid var(--border)", borderRadius: 12, background: "#fff" }} /> : <div className="muted small">Loading the document…</div>;
   return <DocxView storagePath={agreement.docx_path} />;
 }
 
@@ -1360,9 +1428,10 @@ function SignBox({ agreement, e, onSigned, label, preview }) {
   const [ok, setOk] = useState(false);
   const sign = () => run(async () => {
     await rpc("portal_sign_agreement", { p_agreement: agreement.id, p_name: name, p_title: title || null, p_ip: null, p_ua: navigator.userAgent, p_signature: sig });
+    try { await callFn("engagement-send", { kind: "stamp", agreement_id: agreement.id }); } catch (_) { /* the stamped copy can be produced later by staff */ }
     await onSigned();
-  }, `${label} signed`);
-  if (agreement.status === "signed") return <div className="note">Signed on {day(agreement.signed_at)}. Thank you.</div>;
+  }, `${label} signed. A copy signed by both parties is on its way to your inbox.`);
+  if (agreement.status === "signed") return <div className="note">Signed on {day(agreement.signed_at)}. Thank you. The copy signed by both parties is shown above and has been emailed to you.</div>;
   return (
     <div className="card" style={{ padding: 16, borderColor: "var(--accent)", maxWidth: 760 }}>
       <h3 style={{ marginBottom: 8 }}>Sign the {label}</h3>
@@ -1466,7 +1535,7 @@ function Portal({ session }) {
             {letter ? (<><AgreementView agreement={letter} /><div style={{ height: 16 }} /><SignBox agreement={letter} e={e} onSigned={load} label="engagement letter" preview={preview} /></>) : <Empty title="Not sent yet">We'll email you when the engagement letter is ready.</Empty>}
           </>
         )}
-        {current === "invoices" && <FilesStep invoices={invoices} shared={shared} feed={feed} />}
+        {current === "invoices" && <FilesStep invoices={invoices} shared={shared} feed={feed} docs={docs} />}
       </main>
     </div>
   );
@@ -1474,9 +1543,28 @@ function Portal({ session }) {
 
 function CompanyForm({ e, reload, preview }) {
   const [run, busy] = useAction();
+  const [editing, setEditing] = useState(!e.company_confirmed_at);
   const [f, setF] = useState({ company_name: e.company_name ?? "", client_title: e.client_title ?? "", company_address: e.company_address ?? "", company_country: e.company_country ?? "", company_tax_id: e.company_tax_id ?? "", company_industry: e.company_industry ?? "" });
   const set = (k) => (x) => setF({ ...f, [k]: x.target.value });
-  const save = () => run(() => rpc("portal_update_company", { p_id: e.id, p_company_name: f.company_name, p_client_title: f.client_title, p_address: f.company_address, p_country: f.company_country, p_tax_id: f.company_tax_id || null, p_industry: f.company_industry || null }).then(reload), "Confirmed, thank you");
+  const save = () => run(async () => {
+    await rpc("portal_update_company", { p_id: e.id, p_company_name: f.company_name, p_client_title: f.client_title, p_address: f.company_address, p_country: f.company_country, p_tax_id: f.company_tax_id || null, p_industry: f.company_industry || null });
+    await reload(); setEditing(false);
+  }, "Confirmed, thank you");
+  if (!editing) return (
+    <>
+      <div className="pagehead"><div><h1>Company details</h1><p>Confirmed on {day(e.company_confirmed_at)}.</p></div></div>
+      <Card style={{ maxWidth: 760 }} title={<span><Chip kind="ok">Confirmed</Chip></span>} right={<button className="btn" disabled={preview} onClick={() => setEditing(true)}>Edit</button>}>
+        <dl className="kv">
+          <dt>Company</dt><dd>{e.company_name || "Individual"}</dd>
+          <dt>Signatory</dt><dd>{e.client_name}{e.client_title && `, ${e.client_title}`}</dd>
+          <dt>Industry</dt><dd>{e.company_industry || "—"}</dd>
+          <dt>Address</dt><dd style={{ whiteSpace: "pre-line" }}>{e.company_address}</dd>
+          <dt>Country</dt><dd>{e.company_country}</dd>
+          <dt>Tax number</dt><dd>{e.company_tax_id || "—"}</dd>
+        </dl>
+      </Card>
+    </>
+  );
   return (
     <>
       <div className="pagehead"><div><h1>Company details</h1><p>We've filled in what we know. Please correct anything that's wrong and confirm.</p></div></div>
@@ -1585,7 +1673,7 @@ function DepositStepClient({ e, deposit, invoice, reload, preview }) {
   );
 }
 
-function FilesStep({ invoices, shared, feed }) {
+function FilesStep({ invoices, shared, feed, docs }) {
   const open = async (path) => window.open(await signedUrl(path), "_blank");
   return (
     <>
@@ -1599,16 +1687,23 @@ function FilesStep({ invoices, shared, feed }) {
                   <td>{INVOICE_NAMES[i.seq]}<div className="muted small">{i.issuing_entity}-{String(i.invoice_no).padStart(4, "0")}{i.due_at && ` · due ${day(i.due_at)}`}</div></td>
                   <td style={{ textAlign: "right" }}>{money(i.amount, i.currency)}</td>
                   <td style={{ textAlign: "right" }}><Chip kind={i.status === "paid" ? "ok" : "warn"}>{i.status}</Chip></td>
-                  <td style={{ textAlign: "right" }}>{i.pdf_path && <button className="btn" onClick={() => open(i.pdf_path)}>PDF</button>}</td>
+                  <td style={{ textAlign: "right" }}><span className="row" style={{ justifyContent: "flex-end" }}>{i.pdf_path && <button className="btn" onClick={() => open(i.pdf_path)}>Invoice</button>}{i.receipt_path && <button className="btn" onClick={() => open(i.receipt_path)}>Receipt</button>}</span></td>
                 </tr>
               ))}
             </tbody></table>
           )}
         </Card>
-        <Card title="Files from Consortia">
+        <Card title="Shared files">
+          <h3 style={{ marginBottom: 6 }}>From Consortia</h3>
           {shared.filter((d) => d.kind !== "invoice").length === 0 ? <span className="muted small">Nothing shared yet.</span> : (
             <div className="stack" style={{ gap: 6 }}>
               {shared.filter((d) => d.kind !== "invoice").map((d) => <div key={d.id} className="row between small"><span>{d.name}</span><button className="btn" onClick={() => open(d.storage_path)}>Open</button></div>)}
+            </div>
+          )}
+          <h3 style={{ margin: "14px 0 6px" }}>Your uploads</h3>
+          {(docs ?? []).filter((d) => d.uploaded_at).length === 0 ? <span className="muted small">Nothing uploaded yet.</span> : (
+            <div className="stack" style={{ gap: 6 }}>
+              {(docs ?? []).filter((d) => d.uploaded_at).map((d) => <div key={d.id} className="row between small"><span>{d.label}<div className="muted">{fileNameOf(d.storage_path)}</div></span><button className="btn" onClick={() => open(d.storage_path)}>Open</button></div>)}
             </div>
           )}
         </Card>
