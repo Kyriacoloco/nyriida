@@ -329,8 +329,8 @@ function Login() {
         <h1>Solonos</h1>
         {sent ? (
           <>
-            <p>Check {email}: click the button in the email, or type the 6-digit code here.{mode === "reset" && " You'll then choose a new password."}</p>
-            <input inputMode="numeric" maxLength={6} placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} style={{ letterSpacing: 6, fontSize: 20, textAlign: "center" }} />
+            <p>Check {email}: click the button in the email, or type the code here.{mode === "reset" && " You'll then choose a new password."}</p>
+            <input inputMode="numeric" maxLength={10} placeholder="Code from the email" value={code} onChange={(e) => setCode(e.target.value)} style={{ letterSpacing: 6, fontSize: 20, textAlign: "center" }} />
             {err && <p className="err">{err}</p>}
             <button className="btn primary" disabled={busy || code.trim().length < 6}>{busy ? "Checking…" : "Continue"}</button>
           </>
@@ -1234,8 +1234,8 @@ function PortalLogin() {
         <h1>Consortia Advisory</h1>
         {sent ? (
           <>
-            <p>We've emailed {email}. Either click the button in the email, or type the 6-digit code from it here.</p>
-            <input inputMode="numeric" pattern="[0-9]*" maxLength={6} placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} style={{ letterSpacing: 6, fontSize: 20, textAlign: "center" }} />
+            <p>We've emailed {email}. Either click the button in the email, or type the code from it here.</p>
+            <input inputMode="numeric" pattern="[0-9]*" maxLength={10} placeholder="Code from the email" value={code} onChange={(e) => setCode(e.target.value)} style={{ letterSpacing: 6, fontSize: 20, textAlign: "center" }} />
             {err && <p className="err">{err}</p>}
             <button className="btn primary" disabled={busy || code.trim().length < 6}>{busy ? "Checking…" : "Open my page"}</button>
             <p style={{ marginTop: 12, fontSize: 13 }}><a href="#" style={{ color: "var(--on)", opacity: .85 }} onClick={(x) => { x.preventDefault(); setSent(false); setCode(""); }}>Use a different email</a></p>
