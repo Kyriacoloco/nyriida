@@ -137,6 +137,7 @@ h3 { font: 600 14px/1.3 Inter, sans-serif; margin: 0; }
 
 </style>
 <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
 <body>
 <div id="root"></div>
@@ -146,6 +147,7 @@ h3 { font: 600 14px/1.3 Inter, sans-serif; margin: 0; }
 // SOLONOS — single-file app. Only two things you ever change here:
 const SUPABASE_URL = "https://uirbiqfkgnfnfugfclmu.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_hrhOfXXHVMivsY0rritFKQ_WhQE2TIl";
+const TURNSTILE_SITE_KEY = "0x4AAAAAAEybfN1dVcW9utbF";   // Cloudflare Turnstile (empty = no captcha)
 // =====================================================================
 
 import React, { Fragment, createContext, useCallback, useContext, useEffect, useState } from "https://esm.sh/react@18.3.1";
@@ -287,6 +289,27 @@ function Card({ title, right, children, style }) {
   );
 }
 
+// ===================== captcha (Cloudflare Turnstile) =====================
+const captchaOn = () => TURNSTILE_SITE_KEY && !TURNSTILE_SITE_KEY.startsWith("PASTE");
+function Captcha({ onToken }) {
+  const ref = React.useRef(null);
+  const idRef = React.useRef(null);
+  useEffect(() => {
+    if (!captchaOn()) return;
+    let tries = 0;
+    const t = setInterval(() => {
+      if (window.turnstile && ref.current && idRef.current === null) {
+        idRef.current = window.turnstile.render(ref.current, { sitekey: TURNSTILE_SITE_KEY, theme: "light", callback: onToken, "expired-callback": () => onToken(null), "error-callback": () => onToken(null) });
+        clearInterval(t);
+      } else if (++tries > 100) clearInterval(t);
+    }, 100);
+    return () => { clearInterval(t); if (idRef.current !== null && window.turnstile) { try { window.turnstile.remove(idRef.current); } catch (_) {} } };
+  }, []);
+  if (!captchaOn()) return null;
+  return <div ref={ref} style={{ margin: "10px 0" }} />;
+}
+const resetCaptcha = () => { try { window.turnstile && window.turnstile.reset(); } catch (_) {} };
+
 // ===================== pages/Login.jsx =====================
 function Login() {
   const nav = useNavigate();
@@ -297,22 +320,25 @@ function Login() {
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [captcha, setCaptcha] = useState(null);
 
   async function submit(e) {
-    e.preventDefault(); setBusy(true); setErr("");
+    e.preventDefault();
+    if (captchaOn() && !captcha) { setErr("Please tick the \"I'm not a robot\" box."); return; }
+    setBusy(true); setErr("");
+    let error;
     if (mode === "password") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      setBusy(false);
+      ({ error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: captcha } }));
       if (error) setErr(error.message === "Invalid login credentials" ? "Wrong email or password." : error.message);
     } else if (mode === "link") {
-      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin + "/" } });
-      setBusy(false);
+      ({ error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin + "/", captchaToken: captcha } }));
       if (error) setErr(error.message); else setSent(true);
     } else {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + "/reset" });
-      setBusy(false);
+      ({ error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + "/reset", captchaToken: captcha }));
       if (error) setErr(error.message); else setSent(true);
     }
+    setBusy(false);
+    if (error) { setCaptcha(null); resetCaptcha(); }
   }
   async function verify(e) {
     e.preventDefault(); setBusy(true); setErr("");
@@ -341,6 +367,7 @@ function Login() {
             {mode === "password" && (
               <input type="password" required placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ marginTop: 8 }} />
             )}
+            <Captcha onToken={setCaptcha} />
             {err && <p className="err">{err}</p>}
             <button className="btn primary" disabled={busy}>{busy ? "Working…" : mode === "password" ? "Sign in" : mode === "link" ? "Email me a link" : "Reset my password"}</button>
             <p style={{ marginTop: 14, fontSize: 13, display: "flex", gap: 14, justifyContent: "center" }}>
@@ -1217,11 +1244,14 @@ function PortalLogin() {
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [captcha, setCaptcha] = useState(null);
   async function send(e) {
-    e.preventDefault(); setBusy(true); setErr("");
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin + "/portal", shouldCreateUser: true } });
+    e.preventDefault();
+    if (captchaOn() && !captcha) { setErr("Please tick the \"I'm not a robot\" box."); return; }
+    setBusy(true); setErr("");
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin + "/portal", shouldCreateUser: true, captchaToken: captcha } });
     setBusy(false);
-    if (error) setErr(error.message); else setSent(true);
+    if (error) { setErr(error.message); setCaptcha(null); resetCaptcha(); } else setSent(true);
   }
   async function verify(e) {
     e.preventDefault(); setBusy(true); setErr("");
@@ -1245,6 +1275,7 @@ function PortalLogin() {
           <>
             <p>Your private page for the valuation engagement. Enter the email address we wrote to.</p>
             <input type="email" required placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Captcha onToken={setCaptcha} />
             {err && <p className="err">{err}</p>}
             <button className="btn primary" disabled={busy}>{busy ? "Sending…" : "Send me the link and code"}</button>
           </>
