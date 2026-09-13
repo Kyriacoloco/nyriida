@@ -496,7 +496,7 @@ function ConvertForm({ lead, onCancel }) {
     company_address: "",
     company_country: lead.country === "CY" ? "Cyprus" : (lead.country ?? ""),
     company_tax_id: "",
-    company_industry: c["Industry"] ?? c["industry"] ?? "",
+    company_industry: Object.entries(c).find(([k]) => /industry/i.test(k))?.[1] ?? "",
     is_individual: false,
   });
   const set = (k) => (x) => setF({ ...f, [k]: x.target.type === "checkbox" ? x.target.checked : x.target.value });
@@ -736,6 +736,7 @@ function EngagementDetail() {
         </div>
         <div className="row">
           <a className="btn" href="/app/valuation-builder" target="_blank" rel="noreferrer">Valuation Builder</a>
+          <a className="btn" href={`${PORTAL_URL}?as=${e.id}`} target="_blank" rel="noreferrer">Preview client's page</a>
           <Chip kind={e.stage === "declined" ? "danger" : e.stage === "completed" ? "ok" : "brand"}>{stageLabel(e.stage)}</Chip>
         </div>
       </div>
@@ -848,7 +849,7 @@ function SendNdaStep({ e, agreements, reload }) {
       {missing.length > 0 && <div className="err">Fill in the client's {missing.join(" and ")} (Client details, right) before sending.</div>}
       <div className="row">
         <button className="btn primary" disabled={busy || missing.length > 0} onClick={send}>{nda ? "Resend NDA + deposit" : "Send NDA + deposit + portal link"}</button>
-        <a className="btn" href={PORTAL_URL} target="_blank" rel="noreferrer">Open portal</a>
+        <a className="btn" href={`${PORTAL_URL}?as=${e.id}`} target="_blank" rel="noreferrer">Preview client's page</a>
       </div>
     </div>
   );
@@ -1296,26 +1297,53 @@ function AgreementView({ agreement }) {
   return <DocxView storagePath={agreement.docx_path} />;
 }
 
-function SignBox({ agreement, e, onSigned, label }) {
+/** Draw-your-signature box (mouse or finger). Exports a PNG data URL. */
+function SignaturePad({ onChange }) {
+  const ref = React.useRef(null);
+  const drawing = React.useRef(false);
+  const pos = (ev) => {
+    const r = ref.current.getBoundingClientRect();
+    const p = ev.touches ? ev.touches[0] : ev;
+    return { x: (p.clientX - r.left) * (ref.current.width / r.width), y: (p.clientY - r.top) * (ref.current.height / r.height) };
+  };
+  const start = (ev) => { drawing.current = true; const c = ref.current.getContext("2d"); const { x, y } = pos(ev); c.beginPath(); c.moveTo(x, y); ev.preventDefault(); };
+  const move = (ev) => { if (!drawing.current) return; const c = ref.current.getContext("2d"); c.lineWidth = 2.2; c.lineCap = "round"; c.strokeStyle = "#1a1a4a"; const { x, y } = pos(ev); c.lineTo(x, y); c.stroke(); ev.preventDefault(); };
+  const end = () => { if (!drawing.current) return; drawing.current = false; onChange(ref.current.toDataURL("image/png")); };
+  const clear = () => { const c = ref.current.getContext("2d"); c.clearRect(0, 0, ref.current.width, ref.current.height); onChange(null); };
+  return (
+    <div>
+      <canvas ref={ref} width={600} height={180}
+        style={{ width: "100%", maxWidth: 600, height: 180, background: "#fff", border: "1px dashed var(--border-dash)", borderRadius: 8, touchAction: "none", cursor: "crosshair" }}
+        onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end}
+        onTouchStart={start} onTouchMove={move} onTouchEnd={end} />
+      <div className="row" style={{ marginTop: 6 }}><span className="muted small">Sign inside the box with your mouse or finger.</span><button type="button" className="btn" onClick={clear}>Clear</button></div>
+    </div>
+  );
+}
+
+function SignBox({ agreement, e, onSigned, label, preview }) {
   const [run, busy] = useAction();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(e.client_name ?? "");
   const [title, setTitle] = useState(e.client_title ?? "");
+  const [sig, setSig] = useState(null);
   const [ok, setOk] = useState(false);
   const sign = () => run(async () => {
-    await rpc("portal_sign_agreement", { p_agreement: agreement.id, p_name: name, p_title: title || null, p_ip: null, p_ua: navigator.userAgent });
+    await rpc("portal_sign_agreement", { p_agreement: agreement.id, p_name: name, p_title: title || null, p_ip: null, p_ua: navigator.userAgent, p_signature: sig });
     await onSigned();
   }, `${label} signed`);
   if (agreement.status === "signed") return <div className="note">Signed on {day(agreement.signed_at)}. Thank you.</div>;
   return (
-    <div className="card" style={{ padding: 16, borderColor: "var(--accent)" }}>
+    <div className="card" style={{ padding: 16, borderColor: "var(--accent)", maxWidth: 760 }}>
       <h3 style={{ marginBottom: 8 }}>Sign the {label}</h3>
-      <p className="small muted" style={{ marginTop: 0 }}>Type your full name exactly as it appears in the document: <strong>{e.client_name}</strong>.</p>
       <div className="grid2">
-        <Field label="Full name"><input value={name} onChange={(x) => setName(x.target.value)} /></Field>
+        <Field label="Full name (as on the document)"><input value={name} onChange={(x) => setName(x.target.value)} /></Field>
         <Field label="Title"><input value={title} onChange={(x) => setTitle(x.target.value)} placeholder="Director" /></Field>
       </div>
-      <label className="check" style={{ margin: "10px 0" }}><input type="checkbox" checked={ok} onChange={(x) => setOk(x.target.checked)} />I have read the {label} and agree to be bound by it. Typing my name is my electronic signature.</label>
-      <button className="btn primary" disabled={busy || !ok || !name} onClick={sign}>{busy ? "Signing…" : `Sign the ${label}`}</button>
+      <div style={{ margin: "12px 0 4px" }} className="small muted">Signature</div>
+      <SignaturePad onChange={setSig} />
+      <label className="check" style={{ margin: "12px 0" }}><input type="checkbox" checked={ok} onChange={(x) => setOk(x.target.checked)} />I have read the {label} and agree to be bound by it. My typed name and drawn signature are my electronic signature.</label>
+      <button className="btn primary" disabled={preview || busy || !ok || !name || !sig} onClick={sign}>{busy ? "Signing…" : `Sign the ${label}`}</button>
+      {preview && <span className="muted small" style={{ marginLeft: 10 }}>Preview: only the client can sign.</span>}
     </div>
   );
 }
@@ -1330,9 +1358,17 @@ function Portal({ session }) {
   const [feed, setFeed] = useState([]);
   const [step, setStep] = useState(null);
 
+  const previewId = new URLSearchParams(window.location.search).get("as");
+  const preview = !!previewId;
   const load = useCallback(async () => {
-    const { data: raw } = await supabase.rpc("portal_my_engagement");
-    const eng = Array.isArray(raw) ? raw[0] : raw;
+    let eng = null;
+    if (previewId) {
+      const { data } = await supabase.from("engagements").select("*").eq("id", previewId).maybeSingle();   // staff RLS
+      eng = data;
+    } else {
+      const { data: raw } = await supabase.rpc("portal_my_engagement");
+      eng = Array.isArray(raw) ? raw[0] : raw;
+    }
     if (!eng || !eng.id) { setE(null); return; }
     setE(eng);
     const [a, d, dep, inv, sh, f] = await Promise.all([
@@ -1344,7 +1380,7 @@ function Portal({ session }) {
       supabase.from("activity_log").select("*").eq("engagement_id", eng.id).eq("visible_to_client", true).order("created_at", { ascending: false }).limit(20),
     ]);
     setAgreements(a.data ?? []); setDocs(d.data ?? []); setDeposit(dep.data); setInvoices(inv.data ?? []); setShared(sh.data ?? []); setFeed(f.data ?? []);
-  }, []);
+  }, [previewId]);
   useEffect(() => { load(); }, [load]);
 
   if (e === undefined) return null;
@@ -1383,19 +1419,20 @@ function Portal({ session }) {
         </div>
       </nav>
       <main className="main">
+        {preview && <div className="note" style={{ marginBottom: 14, background: "#F5E4C0" }}>Staff preview of {e.client_name}'s page. You see what they see; signing, confirming and uploading are disabled here.</div>}
         {current === "nda" && (
           <>
             <div className="pagehead"><div><h1>Non-Disclosure Agreement</h1><p>Read it below, then sign at the bottom. This is what lets us receive your financial information in confidence.</p></div></div>
-            {nda ? (<><AgreementView agreement={nda} /><div style={{ height: 16 }} /><SignBox agreement={nda} e={e} onSigned={load} label="NDA" /></>) : <Empty title="Not sent yet">We'll email you when the NDA is ready.</Empty>}
+            {nda ? (<><AgreementView agreement={nda} /><div style={{ height: 16 }} /><SignBox agreement={nda} e={e} onSigned={load} label="NDA" preview={preview} /></>) : <Empty title="Not sent yet">We'll email you when the NDA is ready.</Empty>}
           </>
         )}
-        {current === "company" && <CompanyForm e={e} reload={load} />}
-        {current === "docs" && <UploadStep e={e} docs={docs} reload={load} />}
-        {current === "deposit" && <DepositStepClient e={e} deposit={deposit} invoice={invoices.find((i) => i.seq === 0)} reload={load} />}
+        {current === "company" && <CompanyForm e={e} reload={load} preview={preview} />}
+        {current === "docs" && <UploadStep e={e} docs={docs} reload={load} preview={preview} />}
+        {current === "deposit" && <DepositStepClient e={e} deposit={deposit} invoice={invoices.find((i) => i.seq === 0)} reload={load} preview={preview} />}
         {current === "letter" && (
           <>
             <div className="pagehead"><div><h1>Engagement letter</h1><p>The terms of the valuation engagement. Read it, then sign at the bottom.</p></div></div>
-            {letter ? (<><AgreementView agreement={letter} /><div style={{ height: 16 }} /><SignBox agreement={letter} e={e} onSigned={load} label="engagement letter" /></>) : <Empty title="Not sent yet">We'll email you when the engagement letter is ready.</Empty>}
+            {letter ? (<><AgreementView agreement={letter} /><div style={{ height: 16 }} /><SignBox agreement={letter} e={e} onSigned={load} label="engagement letter" preview={preview} /></>) : <Empty title="Not sent yet">We'll email you when the engagement letter is ready.</Empty>}
           </>
         )}
         {current === "invoices" && <FilesStep invoices={invoices} shared={shared} feed={feed} />}
@@ -1404,50 +1441,75 @@ function Portal({ session }) {
   );
 }
 
-function CompanyForm({ e, reload }) {
+function CompanyForm({ e, reload, preview }) {
   const [run, busy] = useAction();
-  const [f, setF] = useState({ company_address: e.company_address ?? "", company_country: e.company_country ?? "", company_tax_id: e.company_tax_id ?? "", company_industry: e.company_industry ?? "" });
+  const [f, setF] = useState({ company_name: e.company_name ?? "", client_title: e.client_title ?? "", company_address: e.company_address ?? "", company_country: e.company_country ?? "", company_tax_id: e.company_tax_id ?? "", company_industry: e.company_industry ?? "" });
   const set = (k) => (x) => setF({ ...f, [k]: x.target.value });
-  const save = () => run(() => rpc("portal_update_company", { p_id: e.id, p_address: f.company_address, p_country: f.company_country, p_tax_id: f.company_tax_id || null, p_industry: f.company_industry || null }).then(reload), "Saved");
+  const save = () => run(() => rpc("portal_update_company", { p_id: e.id, p_company_name: f.company_name, p_client_title: f.client_title, p_address: f.company_address, p_country: f.company_country, p_tax_id: f.company_tax_id || null, p_industry: f.company_industry || null }).then(reload), "Confirmed, thank you");
   return (
     <>
-      <div className="pagehead"><div><h1>Company details</h1><p>Please check and complete. These appear on the engagement letter and invoices.</p></div></div>
-      <Card>
+      <div className="pagehead"><div><h1>Company details</h1><p>We've filled in what we know. Please correct anything that's wrong and confirm.</p></div></div>
+      <Card style={{ maxWidth: 760 }}>
         <div className="stack">
-          <dl className="kv"><dt>Company</dt><dd>{e.company_name || "Individual"}</dd><dt>Signatory</dt><dd>{e.client_name}{e.client_title && `, ${e.client_title}`}</dd></dl>
+          <div className="grid2">
+            <Field label="Company"><input value={f.company_name} onChange={set("company_name")} placeholder={e.is_individual ? "Individual" : ""} /></Field>
+            <Field label="Signatory"><input value={e.client_name} disabled /></Field>
+          </div>
+          <div className="grid2">
+            <Field label="Signatory's title"><input value={f.client_title} onChange={set("client_title")} placeholder="Director" /></Field>
+            <Field label="Industry"><input value={f.company_industry} onChange={set("company_industry")} placeholder="e.g. Software, Hospitality, Manufacturing" /></Field>
+          </div>
           <Field label="Registered address"><textarea rows={2} value={f.company_address} onChange={set("company_address")} /></Field>
           <div className="grid2">
             <Field label="Country of incorporation"><input value={f.company_country} onChange={set("company_country")} /></Field>
             <Field label="Registration / tax number"><input value={f.company_tax_id} onChange={set("company_tax_id")} /></Field>
           </div>
-          <Field label="Industry"><input value={f.company_industry} onChange={set("company_industry")} placeholder="e.g. Software, Hospitality, Manufacturing" /></Field>
-          <div><button className="btn primary" disabled={busy || !f.company_address || !f.company_country} onClick={save}>Save</button></div>
+          <div><button className="btn primary" disabled={preview || busy || !f.company_address || !f.company_country} onClick={save}>Confirm</button></div>
         </div>
       </Card>
     </>
   );
 }
 
-function UploadStep({ e, docs, reload }) {
+const ACCEPT = ".pdf,.xlsx,.xls,.csv,.docx,.doc,.pptx,.png,.jpg,.jpeg,.zip";
+const MAX_MB = 50;
+const fileNameOf = (path) => (path ? path.split("/").pop().replace(/^[0-9a-f-]{36}-/, "") : "");
+
+function UploadStep({ e, docs, reload, preview }) {
   const [run, busy] = useAction();
   async function upload(d, file) {
+    if (file.size > MAX_MB * 1024 * 1024) { alert(`That file is ${(file.size / 1048576).toFixed(0)} MB; the limit is ${MAX_MB} MB.`); return; }
     await run(async () => {
       const path = `${e.id}/${d.id}-${file.name}`;
       const { error } = await supabase.storage.from("client-uploads").upload(path, file, { upsert: true });
       if (error) throw new Error(error.message);
       await rpc("portal_mark_uploaded", { p_doc: d.id, p_storage_path: `client-uploads/${path}` });
       await reload();
-    }, `${d.label} uploaded`);
+    }, `${d.label}: uploaded`);
   }
+  async function remove(d) {
+    await run(async () => {
+      if (d.storage_path) await supabase.storage.from("client-uploads").remove([d.storage_path.replace(/^client-uploads\//, "")]);
+      await rpc("portal_remove_upload", { p_doc: d.id });
+      await reload();
+    }, "Removed. Upload a new file when ready.");
+  }
+  const done = docs.filter((d) => d.uploaded_at).length;
   return (
     <>
-      <div className="pagehead"><div><h1>Upload your documents</h1><p>One file per line. PDF or Excel is fine. Everything is covered by the NDA.</p></div></div>
-      <Card>
-        <div className="stack" style={{ gap: 8 }}>
+      <div className="pagehead"><div><h1>Upload your documents</h1><p>One file per line. Accepted: PDF, Excel (xlsx/xls/csv), Word, PowerPoint, images or a zip, up to {MAX_MB} MB each. Everything is covered by the NDA.</p></div></div>
+      <Card title="Your documents" right={<span className="muted small">{done}/{docs.length} received</span>} style={{ maxWidth: 760 }}>
+        <div className="stack" style={{ gap: 0 }}>
           {docs.map((d) => (
-            <div key={d.id} className="row between" style={{ padding: "8px 0", borderBottom: "1px solid var(--border-sub)" }}>
-              <span>{d.uploaded_at ? "✓ " : "○ "}{d.label}{!d.required && <span className="muted small"> (optional)</span>}{d.uploaded_at && <span className="muted small"> · received {day(d.uploaded_at)}</span>}</span>
-              <label className="btn" style={{ cursor: "pointer" }}>{d.uploaded_at ? "Replace" : "Upload"}<input type="file" style={{ display: "none" }} disabled={busy} onChange={(x) => x.target.files[0] && upload(d, x.target.files[0])} /></label>
+            <div key={d.id} style={{ padding: "10px 0", borderBottom: "1px solid var(--border-sub)" }}>
+              <div className="row between">
+                <span>{d.uploaded_at ? <Chip kind="ok">received</Chip> : <Chip kind="warn">{d.required ? "needed" : "optional"}</Chip>} <span style={{ marginLeft: 6 }}>{d.label}</span></span>
+                <span className="row">
+                  {d.uploaded_at && <button className="btn" disabled={preview || busy} onClick={() => remove(d)}>Remove</button>}
+                  <label className="btn" style={{ cursor: preview ? "default" : "pointer", opacity: preview ? .5 : 1 }}>{d.uploaded_at ? "Replace" : "Upload"}<input type="file" accept={ACCEPT} style={{ display: "none" }} disabled={preview || busy} onChange={(x) => x.target.files[0] && upload(d, x.target.files[0])} /></label>
+                </span>
+              </div>
+              {d.uploaded_at && <div className="muted small" style={{ marginTop: 4 }}>📄 {fileNameOf(d.storage_path)} · uploaded {day(d.uploaded_at)}</div>}
             </div>
           ))}
           {docs.length === 0 && <span className="muted small">The document list will appear here once we've set it up.</span>}
@@ -1457,7 +1519,7 @@ function UploadStep({ e, docs, reload }) {
   );
 }
 
-function DepositStepClient({ e, deposit, invoice, reload }) {
+function DepositStepClient({ e, deposit, invoice, reload, preview }) {
   const [run, busy] = useAction();
   const [ref, setRef] = useState("");
   const claim = () => run(() => rpc("portal_claim_deposit_paid", { p_id: e.id, p_reference: ref || null }).then(reload), "Thank you, we'll confirm once it lands");
@@ -1466,7 +1528,7 @@ function DepositStepClient({ e, deposit, invoice, reload }) {
   return (
     <>
       <div className="pagehead"><div><h1>Engagement deposit</h1><p>EUR 1,000, non-refundable, credited against the first instalment of the fee.</p></div></div>
-      <Card title={invoice ? `Invoice ${invoice.issuing_entity}-${String(invoice.invoice_no).padStart(4, "0")}` : "Deposit"} right={invoice?.pdf_path && <button className="btn" onClick={dl}>Download invoice (PDF)</button>}>
+      <Card style={{ maxWidth: 760 }} title={invoice ? `Invoice ${invoice.issuing_entity}-${String(invoice.invoice_no).padStart(4, "0")}` : "Deposit"} right={invoice?.pdf_path && <button className="btn" onClick={dl}>Download invoice (PDF)</button>}>
         {invoice ? (
           <dl className="kv">
             <dt>Amount</dt><dd><strong>{money(invoice.amount, invoice.currency)}</strong></dd>
@@ -1481,7 +1543,7 @@ function DepositStepClient({ e, deposit, invoice, reload }) {
           {status === "pending" && (
             <div className="row">
               <input placeholder="Your bank reference (optional)" value={ref} onChange={(x) => setRef(x.target.value)} style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--border)" }} />
-              <button className="btn primary" disabled={busy} onClick={claim}>I've made the transfer</button>
+              <button className="btn primary" disabled={preview || busy} onClick={claim}>I've made the transfer</button>
             </div>
           )}
           {status === "claimed" && <div className="note">Thank you. We'll confirm as soon as the transfer lands.</div>}
@@ -1568,7 +1630,7 @@ function Shell({ session, staff, signOut }) {
     <div className="shell">
       <nav className="sidebar">
         <div className="wordmark">Solonos</div>
-        <a href="/portal" target="_blank" rel="noreferrer">Client portal <span className="soon">↗</span></a>
+        <a href="/app/engagements" title="Open an engagement and click 'Preview client's page'">Client portal <span className="soon">via engagement</span></a>
         {NAV.map(([label, to, slice]) => (
           <NavLink key={to} to={to} className={({ isActive }) => (isActive ? "active" : "")}>
             {label}{slice && <span className="soon">slice {slice}</span>}
