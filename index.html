@@ -1218,6 +1218,14 @@ function DocxView({ storagePath }) {
   );
 }
 
+/** Shows the PDF when we have one (converted by Word), otherwise renders the .docx. */
+function AgreementView({ agreement }) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => { if (agreement.pdf_path) signedUrl(agreement.pdf_path, 3600).then(setUrl).catch(() => setUrl(null)); }, [agreement.pdf_path]);
+  if (agreement.pdf_path) return url ? <iframe title="document" src={url} style={{ width: "100%", height: "70vh", border: "1px solid var(--border)", borderRadius: 12, background: "#fff" }} /> : <div className="muted small">Loading the document…</div>;
+  return <DocxView storagePath={agreement.docx_path} />;
+}
+
 function SignBox({ agreement, e, onSigned, label }) {
   const [run, busy] = useAction();
   const [name, setName] = useState("");
@@ -1253,8 +1261,9 @@ function Portal({ session }) {
   const [step, setStep] = useState(null);
 
   const load = useCallback(async () => {
-    const { data: eng } = await supabase.rpc("portal_my_engagement");
-    if (!eng) { setE(null); return; }
+    const { data: raw } = await supabase.rpc("portal_my_engagement");
+    const eng = Array.isArray(raw) ? raw[0] : raw;
+    if (!eng || !eng.id) { setE(null); return; }
     setE(eng);
     const [a, d, dep, inv, sh, f] = await Promise.all([
       supabase.from("agreements").select("*").eq("engagement_id", eng.id).in("status", ["sent", "signed"]).order("created_at"),
@@ -1272,7 +1281,7 @@ function Portal({ session }) {
   if (e === null) return (
     <div className="login"><div className="box">
       <h1>No engagement found</h1>
-      <p>{session.user.email} isn't linked to an engagement. Use the email address we wrote to, or contact info@consortiaadvisory.com.</p>
+      <p>You're signed in as <strong>{session.user.email}</strong>, and that address isn't linked to an engagement. Sign out and use the email address we wrote to, or contact info@consortiaadvisory.com.</p>
       <button className="btn primary" onClick={() => supabase.auth.signOut()}>Try another email</button>
     </div></div>
   );
@@ -1307,7 +1316,7 @@ function Portal({ session }) {
         {current === "nda" && (
           <>
             <div className="pagehead"><div><h1>Non-Disclosure Agreement</h1><p>Read it below, then sign at the bottom. This is what lets us receive your financial information in confidence.</p></div></div>
-            {nda ? (<><DocxView storagePath={nda.docx_path} /><div style={{ height: 16 }} /><SignBox agreement={nda} e={e} onSigned={load} label="NDA" /></>) : <Empty title="Not sent yet">We'll email you when the NDA is ready.</Empty>}
+            {nda ? (<><AgreementView agreement={nda} /><div style={{ height: 16 }} /><SignBox agreement={nda} e={e} onSigned={load} label="NDA" /></>) : <Empty title="Not sent yet">We'll email you when the NDA is ready.</Empty>}
           </>
         )}
         {current === "company" && <CompanyForm e={e} reload={load} />}
@@ -1316,7 +1325,7 @@ function Portal({ session }) {
         {current === "letter" && (
           <>
             <div className="pagehead"><div><h1>Engagement letter</h1><p>The terms of the valuation engagement. Read it, then sign at the bottom.</p></div></div>
-            {letter ? (<><DocxView storagePath={letter.docx_path} /><div style={{ height: 16 }} /><SignBox agreement={letter} e={e} onSigned={load} label="engagement letter" /></>) : <Empty title="Not sent yet">We'll email you when the engagement letter is ready.</Empty>}
+            {letter ? (<><AgreementView agreement={letter} /><div style={{ height: 16 }} /><SignBox agreement={letter} e={e} onSigned={load} label="engagement letter" /></>) : <Empty title="Not sent yet">We'll email you when the engagement letter is ready.</Empty>}
           </>
         )}
         {current === "invoices" && <FilesStep invoices={invoices} shared={shared} feed={feed} />}
