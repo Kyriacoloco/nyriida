@@ -909,7 +909,7 @@ async function callFn(name, body) {
 function SendNdaStep({ e, agreements, reload }) {
   const [run, busy] = useAction();
   const nda = agreements.filter((a) => a.kind === "nda" && a.status !== "void").at(-1);
-  const stamp = () => run(() => callFn("engagement-send", { kind: "stamp", agreement_id: nda.id }).then(reload), "Signed copy created and emailed");
+  const stamp = () => run(() => callFn("engagement-send", { kind: "stamp", agreement_id: nda.id, force: true }).then(reload), "Signed copy created and emailed");
   const open = async (path) => window.open(await signedUrl(path), "_blank");
   const missing = [!e.company_address && "address", !e.company_country && "country"].filter(Boolean);
   const send = () => run(() => callFn("engagement-send", { engagement_id: e.id, kind: "nda" }).then(reload), "NDA, deposit invoice and portal link sent");
@@ -918,7 +918,7 @@ function SendNdaStep({ e, agreements, reload }) {
       {nda ? (
         <div className="row wrap small">NDA v{nda.version} <Chip kind={nda.status === "signed" ? "ok" : "warn"}>{nda.status}</Chip> sent {day(nda.sent_at)}{nda.signed_at && ` · signed ${day(nda.signed_at)}`}
           {(nda.signed_pdf_path ?? nda.pdf_path) && <button className="btn" onClick={() => open(nda.signed_pdf_path ?? nda.pdf_path)}>Open PDF</button>}
-          {nda.status === "signed" && !nda.signed_pdf_path && <button className="btn" disabled={busy} onClick={stamp}>Create signed copy</button>}
+          {nda.status === "signed" && <button className="btn" disabled={busy} onClick={stamp}>{nda.signed_pdf_path ? "Redo signed copy" : "Create signed copy"}</button>}
         </div>
       ) : (
         <p className="small" style={{ margin: 0 }}>One click emails the client from info@: the NDA (filled with their details), the €1,000 deposit invoice, and the link to their Solonos page.</p>
@@ -1018,7 +1018,8 @@ function LetterCard({ e, reload, agreements }) {
     }, "Terms saved");
   }
   const send = (force) => run(() => callFn("engagement-send", { engagement_id: e.id, kind: "letter", force }).then(reload), "Engagement letter sent");
-  const stamp = () => run(() => callFn("engagement-send", { kind: "stamp", agreement_id: letter.id }).then(reload), "Signed copy created and emailed");
+  const stamp = () => run(() => callFn("engagement-send", { kind: "stamp", agreement_id: letter.id, force: true }).then(reload), "Signed copy created and emailed");
+  const regen = () => { if (window.confirm("This creates a fresh letter from the current template and fee and emails it. The client will need to sign it again. Continue?")) send(true); };
   const half = Math.min(Number(fee || 0) * 0.5, 5000);
   return (
     <Card title="Engagement letter" right={letter && <Chip kind={letter.status === "signed" ? "ok" : "warn"}>v{letter.version} {letter.status}</Chip>}>
@@ -1027,8 +1028,9 @@ function LetterCard({ e, reload, agreements }) {
           <div className="row wrap">
             <span className="small">Sent {day(letter.sent_at)}{letter.status === "signed" && `, signed ${day(letter.signed_at)}`}. Fee {eur(e.fee)}.</span>
             {(letter.signed_pdf_path ?? letter.pdf_path) && <button className="btn" onClick={() => open(letter.signed_pdf_path ?? letter.pdf_path)}>Open PDF</button>}
-            {letter.status === "signed" && !letter.signed_pdf_path && <button className="btn" disabled={busy} onClick={stamp}>Create signed copy</button>}
+            {letter.status === "signed" && <button className="btn" disabled={busy} onClick={stamp}>{letter.signed_pdf_path ? "Redo signed copy" : "Create signed copy"}</button>}
             {letter.status === "sent" && <button className="btn" disabled={busy} onClick={() => send(true)}>Resend</button>}
+            {!["valuation_active", "completed"].includes(e.stage) && <button className="btn" disabled={busy} onClick={regen} title="New version from the current template; client signs again">Regenerate and resend</button>}
           </div>
         ) : (
           <>
