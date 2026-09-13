@@ -282,33 +282,39 @@ function Card({ title, right, children, style }) {
 
 // ===================== pages/Login.jsx =====================
 function Login() {
+  const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode] = useState("password");   // password | link
+  const [mode, setMode] = useState("password");   // password | link | reset
   const [sent, setSent] = useState(false);
   const [code, setCode] = useState("");
-  async function verify(e) {
-    e.preventDefault(); setBusy(true); setErr("");
-    const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: "email" });
-    setBusy(false);
-    if (error) setErr("That code didn't work.");
-  }
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit(e) {
-    e.preventDefault();
-    setBusy(true); setErr("");
+    e.preventDefault(); setBusy(true); setErr("");
     if (mode === "password") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setBusy(false);
       if (error) setErr(error.message === "Invalid login credentials" ? "Wrong email or password." : error.message);
-    } else {
+    } else if (mode === "link") {
       const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin + "/" } });
+      setBusy(false);
+      if (error) setErr(error.message); else setSent(true);
+    } else {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + "/reset" });
       setBusy(false);
       if (error) setErr(error.message); else setSent(true);
     }
   }
+  async function verify(e) {
+    e.preventDefault(); setBusy(true); setErr("");
+    const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: mode === "reset" ? "recovery" : "email" });
+    setBusy(false);
+    if (error) setErr("That code didn't work.");
+    else if (mode === "reset") nav("/reset");
+  }
+  const sw = (m) => (x) => { x.preventDefault(); setMode(m); setErr(""); setSent(false); setCode(""); };
 
   return (
     <div className="login">
@@ -316,27 +322,57 @@ function Login() {
         <h1>Solonos</h1>
         {sent ? (
           <>
-            <p>Check {email}: click the link, or type the 6-digit code here. Once inside, set a password from the bottom of the left menu.</p>
+            <p>Check {email}: click the button in the email, or type the 6-digit code here.{mode === "reset" && " You'll then choose a new password."}</p>
             <input inputMode="numeric" maxLength={6} placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value)} style={{ letterSpacing: 6, fontSize: 20, textAlign: "center" }} />
             {err && <p className="err">{err}</p>}
-            <button className="btn primary" disabled={busy || code.trim().length < 6}>{busy ? "Checking…" : "Sign in"}</button>
+            <button className="btn primary" disabled={busy || code.trim().length < 6}>{busy ? "Checking…" : "Continue"}</button>
           </>
         ) : (
           <>
-            <p>{mode === "password" ? "Sign in with your email and password." : "No password yet? Get a one-time link by email."}</p>
+            <p>{mode === "password" ? "Sign in with your email and password." : mode === "link" ? "Get a one-time sign-in link and code by email." : "We'll email you a link and code to choose a new password."}</p>
             <input type="email" required placeholder="you@consortiaadvisory.com" value={email} onChange={(e) => setEmail(e.target.value)} />
             {mode === "password" && (
               <input type="password" required placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ marginTop: 8 }} />
             )}
             {err && <p className="err">{err}</p>}
-            <button className="btn primary" disabled={busy}>{busy ? "Working…" : mode === "password" ? "Sign in" : "Email me a link"}</button>
-            <p style={{ marginTop: 14, fontSize: 13 }}>
-              {mode === "password"
-                ? <a href="#" style={{ color: "var(--on)", opacity: .85 }} onClick={(e) => { e.preventDefault(); setMode("link"); setErr(""); }}>No password yet or forgot it? Email me a link</a>
-                : <a href="#" style={{ color: "var(--on)", opacity: .85 }} onClick={(e) => { e.preventDefault(); setMode("password"); setErr(""); }}>Back to password sign-in</a>}
+            <button className="btn primary" disabled={busy}>{busy ? "Working…" : mode === "password" ? "Sign in" : mode === "link" ? "Email me a link" : "Reset my password"}</button>
+            <p style={{ marginTop: 14, fontSize: 13, display: "flex", gap: 14, justifyContent: "center" }}>
+              {mode !== "password" && <a href="#" style={{ color: "var(--on)", opacity: .85 }} onClick={sw("password")}>Sign in with password</a>}
+              {mode !== "reset" && <a href="#" style={{ color: "var(--on)", opacity: .85 }} onClick={sw("reset")}>Forgot password?</a>}
+              {mode !== "link" && <a href="#" style={{ color: "var(--on)", opacity: .85 }} onClick={sw("link")}>Email me a link</a>}
             </p>
           </>
         )}
+      </form>
+    </div>
+  );
+}
+
+/** /reset — where the password-reset link and code land. Choose a new password, then straight into the app. */
+function ResetPassword() {
+  const nav = useNavigate();
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function save(e) {
+    e.preventDefault();
+    if (pw.length < 8) return setErr("At least 8 characters.");
+    if (pw !== pw2) return setErr("The two passwords don't match.");
+    setBusy(true); setErr("");
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    setBusy(false);
+    if (error) setErr(error.message); else nav("/app/leads");
+  }
+  return (
+    <div className="login">
+      <form className="box" onSubmit={save}>
+        <h1>New password</h1>
+        <p>Choose a password of at least 8 characters.</p>
+        <input type="password" placeholder="New password" value={pw} onChange={(e) => setPw(e.target.value)} />
+        <input type="password" placeholder="Repeat it" value={pw2} onChange={(e) => setPw2(e.target.value)} style={{ marginTop: 8 }} />
+        {err && <p className="err">{err}</p>}
+        <button className="btn primary" disabled={busy}>{busy ? "Saving…" : "Save password and sign in"}</button>
       </form>
     </div>
   );
@@ -1556,7 +1592,8 @@ function App() {
   const [session, setSession] = useState(undefined);
   const [staff, setStaff] = useState(null);
   const nav = useNavigate();
-  const isPortal = useLocation().pathname.startsWith("/portal");
+  const pathname = useLocation().pathname;
+  const isPortal = pathname.startsWith("/portal");
 
   useEffect(() => {
     if (!configured) return;
@@ -1582,6 +1619,7 @@ function App() {
   }
 
   if (!session) return <Login />;
+  if (pathname === "/reset") return <ResetPassword />;
   if (staff === null) return null;
   if (staff === false) return (
     <div className="login"><div className="box">
