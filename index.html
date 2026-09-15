@@ -148,6 +148,7 @@ h3 { font: 600 14px/1.3 Inter, sans-serif; margin: 0; }
 const SUPABASE_URL = "https://uirbiqfkgnfnfugfclmu.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_hrhOfXXHVMivsY0rritFKQ_WhQE2TIl";
 const TURNSTILE_SITE_KEY = "0x4AAAAAAEybfN1dVcW9utbF";   // Cloudflare Turnstile (empty = no captcha)
+const APP_VERSION = "1.1";   // major = big build, minor = small change; shown bottom-left
 // =====================================================================
 
 import React, { Fragment, createContext, useCallback, useContext, useEffect, useState } from "https://esm.sh/react@18.3.1";
@@ -918,7 +919,7 @@ function SendNdaStep({ e, agreements, reload }) {
       {nda ? (
         <div className="row wrap small">NDA v{nda.version} <Chip kind={nda.status === "signed" ? "ok" : "warn"}>{nda.status}</Chip> sent {day(nda.sent_at)}{nda.signed_at && ` · signed ${day(nda.signed_at)}`}
           {(nda.signed_pdf_path ?? nda.pdf_path) && <button className="btn" onClick={() => open(nda.signed_pdf_path ?? nda.pdf_path)}>Open PDF</button>}
-          {nda.status === "signed" && <button className="btn" disabled={busy} onClick={stamp}>{nda.signed_pdf_path ? "Redo signed copy" : "Create signed copy"}</button>}
+          {nda.status === "signed" && !nda.signed_pdf_path && <button className="btn" disabled={busy} onClick={stamp}>Create signed copy</button>}
         </div>
       ) : (
         <p className="small" style={{ margin: 0 }}>One click emails the client from info@: the NDA (filled with their details), the €1,000 deposit invoice, and the link to their Solonos page.</p>
@@ -1006,9 +1007,9 @@ function LetterCard({ e, reload, agreements }) {
   const toggle = (k) => setAppr((a) => (a.includes(k) ? a.filter((x) => x !== k) : [...a, k]));
   const letter = agreements.filter((a) => a.kind === "engagement_letter" && ["sent", "signed"].includes(a.status)).at(-1);
   const ndaSigned = agreements.some((a) => a.kind === "nda" && a.status === "signed");
-  const locked = ["engaged", "valuation_active", "completed", "declined"].includes(e.stage) || !!letter;
   const saved = e.fee && Number(e.fee) === Number(fee) && JSON.stringify(e.approaches ?? []) === JSON.stringify(appr);
   const ready = saved && !!e.company_confirmed_at && ndaSigned;
+  const autoRan = React.useRef(false);
   const open = async (path) => window.open(await signedUrl(path), "_blank");
   async function save() {
     await run(async () => {
@@ -1017,39 +1018,37 @@ function LetterCard({ e, reload, agreements }) {
       await reload();
     }, "Terms saved");
   }
-  const send = (force) => run(() => callFn("engagement-send", { engagement_id: e.id, kind: "letter", force }).then(reload), "Engagement letter sent");
-  const stamp = () => run(() => callFn("engagement-send", { kind: "stamp", agreement_id: letter.id, force: true }).then(reload), "Signed copy created and emailed");
-  const regen = () => { if (window.confirm("This creates a fresh letter from the current template and fee and emails it. The client will need to sign it again. Continue?")) send(true); };
+  // the letter goes out by itself the moment the three conditions are met (also from the client's page)
+  useEffect(() => {
+    if (!letter && ready && !autoRan.current) { autoRan.current = true; run(() => callFn("engagement-send", { engagement_id: e.id, kind: "letter" }).then(reload), "Engagement letter generated, signed and sent"); }
+  }, [ready, letter]);
   const half = Math.min(Number(fee || 0) * 0.5, 5000);
   return (
-    <Card title="Engagement letter" right={letter && <Chip kind={letter.status === "signed" ? "ok" : "warn"}>v{letter.version} {letter.status}</Chip>}>
+    <Card title="Engagement letter" right={letter && <Chip kind={letter.status === "signed" ? "ok" : "warn"}>v{letter.version} {letter.status === "signed" ? "signed by both" : "sent, awaiting signature"}</Chip>}>
       <div className="stack">
         {letter ? (
           <div className="row wrap">
-            <span className="small">Sent {day(letter.sent_at)}{letter.status === "signed" && `, signed ${day(letter.signed_at)}`}. Fee {eur(e.fee)}.</span>
-            {(letter.signed_pdf_path ?? letter.pdf_path) && <button className="btn" onClick={() => open(letter.signed_pdf_path ?? letter.pdf_path)}>Open PDF</button>}
-            {letter.status === "signed" && <button className="btn" disabled={busy} onClick={stamp}>{letter.signed_pdf_path ? "Redo signed copy" : "Create signed copy"}</button>}
-            {letter.status === "sent" && <button className="btn" disabled={busy} onClick={() => send(true)}>Resend</button>}
-            {!["valuation_active", "completed"].includes(e.stage) && <button className="btn" disabled={busy} onClick={regen} title="New version from the current template; client signs again">Regenerate and resend</button>}
+            <span className="small">Sent {day(letter.sent_at)}{letter.status === "signed" && `, signed by ${e.client_name} ${day(letter.signed_at)}`}. Fee {eur(e.fee)}.</span>
+            {letter.status === "signed" && letter.signed_pdf_path && <button className="btn" onClick={() => open(letter.signed_pdf_path)}>Open signed letter</button>}
+            {letter.status === "signed" && !letter.signed_pdf_path && <span className="muted small">Preparing the copy signed by both parties…</span>}
           </div>
         ) : (
           <>
             <div className="grid2">
-              <Field label="Total fee (EUR, no VAT)"><input type="number" min="0" step="100" value={fee} onChange={(x) => setFee(x.target.value)} disabled={locked} /></Field>
+              <Field label="Total fee (EUR, no VAT)"><input type="number" min="0" step="100" value={fee} onChange={(x) => setFee(x.target.value)} /></Field>
               <div className="note" style={{ alignSelf: "end" }}>
                 Invoice 1 on signing: <strong>{eur(Math.max(half - 1000, 0))}</strong> · Invoice 2 before final report: <strong>{eur(Math.max(Number(fee || 0) - half, 0))}</strong> · €1,000 deposit credited
               </div>
             </div>
             <div className="stack" style={{ gap: 6 }}>
               {APPROACHES.map((a) => (
-                <label key={a.key} className="check"><input type="checkbox" checked={appr.includes(a.key)} onChange={() => toggle(a.key)} disabled={locked} />{a.label}</label>
+                <label key={a.key} className="check"><input type="checkbox" checked={appr.includes(a.key)} onChange={() => toggle(a.key)} />{a.label}</label>
               ))}
             </div>
             <div className="row wrap">
-              <button className="btn" disabled={busy || locked || !fee || appr.length === 0 || saved} onClick={save}>{saved ? "Terms saved" : "Save terms"}</button>
-              <button className="btn primary" disabled={busy || !ready} onClick={() => send(false)} title="Normally happens by itself">Send now</button>
+              <button className="btn primary" disabled={busy || !fee || appr.length === 0 || saved} onClick={save}>{saved ? "Terms saved" : "Save terms"}</button>
               <span className="muted small">
-                Goes out by itself when: {saved ? "✓" : "○"} fee saved · {ndaSigned ? "✓" : "○"} NDA signed · {e.company_confirmed_at ? "✓" : "○"} client confirmed details
+                Sent automatically once: {saved ? "✓" : "○"} fee saved · {ndaSigned ? "✓" : "○"} NDA signed · {e.company_confirmed_at ? "✓" : "○"} client confirmed details
               </span>
             </div>
           </>
@@ -1339,7 +1338,7 @@ function Invoices({ invoices, reload }) {
   }, "Marked paid, receipt emailed");
   const open = async (path) => window.open(await signedUrl(path), "_blank");
   const receipt = (id) => run(() => callFn("engagement-send", { kind: "receipt", invoice_id: id }).then(reload), "Receipt created and emailed");
-  const makePdf = (id) => run(() => callFn("engagement-send", { kind: "invoice_pdf", invoice_id: id }).then(reload), "Invoice PDF created and emailed");
+  const makePdf = (id) => run(() => callFn("engagement-send", { kind: "invoice_pdf", invoice_id: id }).then(reload), "Invoice created and emailed to the client");
   const kind = (s) => ({ paid: "ok", issued: "warn", refunded: "", void: "", scheduled: "" })[s];
   return (
     <Card title="Invoices">
@@ -1350,13 +1349,13 @@ function Invoices({ invoices, reload }) {
               <tr key={i.id}>
                 <td>
                   <div>{INVOICE_NAMES[i.seq]}</div>
-                  <div className="muted small">{i.invoice_no ? `${i.issuing_entity} #${i.invoice_no}` : "not numbered"}{i.due_at && ` · due ${day(i.due_at)}`}</div>
+                  <div className="muted small">{i.invoice_no ? `${i.issuing_entity}-${String(i.invoice_no).padStart(4, "0")}` : "not yet issued"}{i.due_at && ` · due ${day(i.due_at)}`}</div>
                 </td>
                 <td style={{ textAlign: "right" }}>{money(i.amount, i.currency)}</td>
                 <td style={{ textAlign: "right" }}>
                   <span className="row" style={{ justifyContent: "flex-end" }}>
                     {i.pdf_path && <button className="btn" onClick={() => open(i.pdf_path)}>PDF</button>}
-                    {!i.pdf_path && i.invoice_no && <button className="btn" disabled={busy} onClick={() => makePdf(i.id)}>Create PDF</button>}
+                    {!i.pdf_path && i.seq > 0 && i.status !== "void" && <button className="btn primary" disabled={busy} onClick={() => makePdf(i.id)}>Create and send</button>}
                     {i.receipt_path && <button className="btn" onClick={() => open(i.receipt_path)}>Receipt</button>}
                     {i.status === "paid" && !i.receipt_path && <button className="btn" disabled={busy} onClick={() => receipt(i.id)}>Create receipt</button>}
                     {i.status === "issued" && i.seq > 0 ? <button className="btn" disabled={busy} onClick={() => paid(i.id)}>Mark paid</button> : <Chip kind={kind(i.status)}>{i.status}</Chip>}
@@ -1367,7 +1366,7 @@ function Invoices({ invoices, reload }) {
           </tbody>
         </table>
       )}
-      <p className="muted small" style={{ margin: "8px 0 0" }}>Bank transfers. Mark them paid when the money lands. The deposit is marked paid from its own card above.</p>
+      <p className="muted small" style={{ margin: "8px 0 0" }}>Create and send each invoice when it's due; when the transfer lands, Mark paid sends the receipt. The deposit is handled from its own card above.</p>
     </Card>
   );
 }
@@ -1666,6 +1665,7 @@ function Portal({ session }) {
         <div className="foot">
           {e.client_name}<br /><span style={{ opacity: .7 }}>{e.company_name}</span><br />
           <button onClick={() => logout("/portal")}>Sign out</button>
+          <div style={{ opacity: .4, fontSize: 10, marginTop: 8 }}>{APP_VERSION}</div>
         </div>
       </nav>
       <main className="main">
@@ -1970,6 +1970,7 @@ function Shell({ session, staff, signOut }) {
           <span style={{ opacity: .7 }}>{staff?.role}</span><br />
           <SetPassword />
           <button onClick={signOut}>Sign out</button>
+          <div style={{ opacity: .5, fontSize: 10, marginTop: 8 }}>Solonos {APP_VERSION}</div>
         </div>
       </nav>
       <main className="main">
